@@ -18,7 +18,7 @@ genai.configure(api_key=api_key)
 print("✅ Gemini API Key loaded successfully")
 
 # Example model usage
-model = genai.GenerativeModel(model_name="models/gemini-1.5-flash")
+model = "models/gemini-2.5-flash"
 
 
 def analyze_with_gemini(analytics: dict) -> str:
