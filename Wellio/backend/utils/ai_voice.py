@@ -7,6 +7,9 @@ import google.generativeai as genai
 from datetime import datetime
 from gtts import gTTS
 
+GENAI_MODEL_NAME = "models/gemini-2.5-flash"
+FALLBACK_MESSAGE = "AI service temporarily unavailable, please try again later."
+
 # Load .env
 load_dotenv()
 api_key = os.getenv("GEMINI_API_KEY")
@@ -18,13 +21,14 @@ genai.configure(api_key=api_key)
 print("✅ Gemini API Key loaded successfully")
 
 # Example model usage
-model = genai.GenerativeModel(model_name="models/gemini-1.5-flash")
+model = genai.GenerativeModel(model_name=GENAI_MODEL_NAME)
+print("✅ Gemini 2.5 Model active: models/gemini-2.5-flash")
 
 
 def analyze_with_gemini(analytics: dict) -> str:
-    """Generate a friendly wellness message using Gemini 1.5 Flash."""
+    """Generate a friendly wellness message using Gemini 2.5 Flash."""
     genai.configure(api_key=os.getenv("GEMINI_API_KEY"))
-    model = genai.GenerativeModel(model_name="models/gemini-1.5-flash")
+    model = genai.GenerativeModel(model_name=GENAI_MODEL_NAME)
 
 
     prompt = f"""
@@ -34,10 +38,13 @@ def analyze_with_gemini(analytics: dict) -> str:
     """
     try:
         response = model.generate_content(prompt)
-        return response.text.strip()
+        if hasattr(response, "text") and response.text:
+            return response.text.strip()
+        print("[Gemini Warning] Empty response received; using fallback message.")
+        return FALLBACK_MESSAGE
     except Exception as e:
         print("[Gemini Error]", e)
-        return "I'm having trouble connecting right now, but you’re doing great!"
+        return FALLBACK_MESSAGE
 
 
 def synthesize_voice(message: str) -> str:

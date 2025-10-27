@@ -16,7 +16,7 @@ from utils.analysis import (
     compute_wellness_score,
     detect_stress_patterns,
 )
-from utils.ai_voice import analyze_with_gemini, synthesize_voice
+from utils.ai_voice import FALLBACK_MESSAGE, analyze_with_gemini, synthesize_voice
 
 health_data_bp = Blueprint("health_data", __name__)
 
@@ -119,9 +119,38 @@ def test_gemini():
             if "generateContent" in m.supported_generation_methods:
                 models.append(m.name)
 
-        return jsonify({
-            "status": "✅ Gemini connection successful",
-            "models": models
-        }), 200
+        ai_message = analyze_with_gemini(
+            {
+                "avg_heart_rate": "n/a",
+                "avg_sleep": "n/a",
+                "stress_status": "n/a",
+                "wellness_score": "n/a",
+            }
+        )
+        audio_path = synthesize_voice(ai_message)
+        voice_url = f"http://127.0.0.1:5000/{audio_path}"
+
+        return (
+            jsonify(
+                {
+                    "status": "✅ Gemini connection successful",
+                    "models": models,
+                    "ai_message": ai_message,
+                    "voice_url": voice_url,
+                }
+            ),
+            200,
+        )
     except Exception as e:
-        return jsonify({"error": str(e)}), 500
+        print("[Gemini Error]", e)
+        fallback_message = FALLBACK_MESSAGE
+        return (
+            jsonify(
+                {
+                    "error": str(e),
+                    "ai_message": fallback_message,
+                    "voice_url": None,
+                }
+            ),
+            500,
+        )
