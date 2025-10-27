@@ -1,9 +1,39 @@
 """Main Flask application for the Wellio backend service."""
+from __future__ import annotations
+
+from pathlib import Path
+
 from flask import Flask
 from dotenv import load_dotenv
 
+
+def _log_environment_safety() -> None:
+    """Validate that sensitive files are ignored in version control."""
+
+    gitignore_path = Path(__file__).resolve().parent / ".gitignore"
+    required_groups = [
+        ["__pycache__/"],
+        ["*.pyc", "*.py[cod]"],
+        [".env"],
+        ["*.env"],
+        [".DS_Store"],
+    ]
+
+    try:
+        content = gitignore_path.read_text()
+    except FileNotFoundError:
+        print("⚠️ .gitignore not found; please ensure environment safety manually.")
+        return
+
+    if all(any(entry in content for entry in group) for group in required_groups):
+        print("✅ Environment safe and clean")
+    else:
+        print("⚠️ Update .gitignore to include environment safeguards.")
+
+
 # Load environment variables from a .env file if present.
 load_dotenv()
+_log_environment_safety()
 
 # Import the blueprint that contains health data routes.
 from routes.health_data import health_data_bp

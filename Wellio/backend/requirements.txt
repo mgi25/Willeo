@@ -3,3 +3,4 @@ pymongo
 python-dotenv
 google-generativeai
 gTTS
+requests

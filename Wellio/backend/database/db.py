@@ -22,7 +22,12 @@ def _get_collection() -> Collection:
     global _client
     if _client is None:
         try:
-            _client = MongoClient(_MONGO_URI)
+            _client = MongoClient(
+                _MONGO_URI,
+                serverSelectionTimeoutMS=2000,
+                connectTimeoutMS=2000,
+                socketTimeoutMS=2000,
+            )
         except Exception as exc:  # pragma: no cover - logging only
             print(f"Error connecting to MongoDB: {exc}")
             raise
@@ -53,4 +58,23 @@ def get_all_records() -> Optional[List[Dict[str, Any]]]:
         return records
     except Exception as exc:  # pragma: no cover - logging only
         print(f"Error fetching records from MongoDB: {exc}")
+        return None
+
+
+def get_records_for_user(user_id: str, limit: int | None = None) -> Optional[List[Dict[str, Any]]]:
+    """Return recent smartwatch records for a specific user."""
+
+    try:
+        collection = _get_collection()
+        query = {"user_id": user_id}
+        cursor = collection.find(query).sort("timestamp", -1)
+        if limit:
+            cursor = cursor.limit(limit)
+        records: List[Dict[str, Any]] = []
+        for document in cursor:
+            document["_id"] = str(document.get("_id"))
+            records.append(document)
+        return records
+    except Exception as exc:  # pragma: no cover - logging only
+        print(f"Error fetching records for user {user_id}: {exc}")
         return None

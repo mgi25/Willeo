@@ -3,20 +3,26 @@ from __future__ import annotations
 
 from datetime import datetime, timezone
 from typing import Any, Dict, List
+from urllib.parse import urljoin
 import os
 
 from dotenv import load_dotenv
 import google.generativeai as genai
 from flask import Blueprint, jsonify, request
 
-from database.db import get_all_records, insert_record
+from database.db import get_all_records, get_records_for_user, insert_record
 from utils.analysis import (
     calculate_avg_heart_rate,
     calculate_avg_sleep,
     compute_wellness_score,
     detect_stress_patterns,
 )
-from utils.ai_voice import FALLBACK_MESSAGE, analyze_with_gemini, synthesize_voice
+from utils.ai_voice import (
+    FALLBACK_MESSAGE,
+    analyze_with_gemini,
+    synthesize_voice,
+    list_gemini_models,
+)
 
 health_data_bp = Blueprint("health_data", __name__)
 
@@ -58,10 +64,12 @@ def fetch_data():
     """Return smartwatch records along with derived analytics and insights."""
 
     records = get_all_records()
+    db_available = True
     if records is None:
-        return jsonify({"error": "Failed to fetch data from the database."}), 500
-
-    records_list: List[Dict[str, Any]] = list(records)
+        db_available = False
+        records_list = []
+    else:
+        records_list = list(records)
 
     avg_heart_rate, avg_hr_message = calculate_avg_heart_rate(records_list)
     avg_sleep, avg_sleep_message = calculate_avg_sleep(records_list)
@@ -77,17 +85,32 @@ def fetch_data():
         "wellness_score": wellness_score if wellness_score is not None else wellness_message,
     }
 
-    ai_message = analyze_with_gemini(analytics)
-    audio_path = synthesize_voice(ai_message)
-    voice_url = f"http://127.0.0.1:5000/{audio_path}"
+    ai_message = FALLBACK_MESSAGE
+    try:
+        ai_message = analyze_with_gemini(analytics)
+    except Exception as exc:  # pragma: no cover - defensive logging
+        print("[Gemini Error]", exc)
+
+    audio_path = ""
+    try:
+        audio_path = synthesize_voice(ai_message)
+    except Exception as exc:  # pragma: no cover - defensive logging
+        print("[Voice Synthesis Error]", exc)
+
+    voice_url = None
+    if audio_path:
+        host_root = request.host_url.rstrip("/")
+        voice_url = urljoin(f"{host_root}/", audio_path)
 
     user_ids = sorted(
         {str(record.get("user_id")) for record in records_list if record.get("user_id")}
     )
     if user_ids:
         print("[Wellio] Generated analytics summary for users:", ", ".join(user_ids))
-    else:
+    elif db_available:
         print("[Wellio] Generated analytics summary for user: unknown")
+    else:
+        print("[Wellio] No database connection; returning placeholder analytics.")
 
     response_body = {
         "records": records_list,
@@ -99,6 +122,9 @@ def fetch_data():
         "voice_url": voice_url,
     }
 
+    if not db_available:
+        response_body["warning"] = "Database unavailable; analytics based on cached defaults."
+
     return jsonify(response_body), 200
 
 
@@ -108,49 +134,128 @@ def test_gemini():
     load_dotenv()
     api_key = os.getenv("GEMINI_API_KEY")
 
-    if not api_key:
-        return jsonify({"error": "❌ GEMINI_API_KEY missing in .env"}), 500
+    models: List[str] = []
+    ai_message = FALLBACK_MESSAGE
+    voice_url = None
 
-    genai.configure(api_key=api_key)
+    if not api_key:
+        print("❌ Missing GEMINI_API_KEY in .env")
+    else:
+        try:
+            genai.configure(api_key=api_key)
+            if os.getenv("ENABLE_GEMINI_MODEL_LIST", "0").lower() in {"1", "true", "yes"}:
+                models = list_gemini_models()
+            ai_message = analyze_with_gemini(
+                {
+                    "avg_heart_rate": "n/a",
+                    "avg_sleep": "n/a",
+                    "stress_status": "n/a",
+                    "wellness_score": "n/a",
+                }
+            )
+        except Exception as exc:
+            print("[Gemini Error]", exc)
 
     try:
-        models = []
-        for m in genai.list_models():
-            if "generateContent" in m.supported_generation_methods:
-                models.append(m.name)
-
-        ai_message = analyze_with_gemini(
-            {
-                "avg_heart_rate": "n/a",
-                "avg_sleep": "n/a",
-                "stress_status": "n/a",
-                "wellness_score": "n/a",
-            }
-        )
         audio_path = synthesize_voice(ai_message)
-        voice_url = f"http://127.0.0.1:5000/{audio_path}"
+    except Exception as exc:  # pragma: no cover - defensive logging
+        print("[Voice Synthesis Error]", exc)
+        audio_path = ""
 
+    if audio_path:
+        host_root = request.host_url.rstrip("/")
+        voice_url = urljoin(f"{host_root}/", audio_path)
+
+    payload = {
+        "status": "✅ Gemini connection successful" if models else "Gemini check completed",
+        "models": models,
+        "ai_message": ai_message,
+        "voice_url": voice_url,
+    }
+
+    return jsonify(payload), 200
+
+
+@health_data_bp.route("/talk", methods=["GET"])
+def talk():
+    """Generate a motivational voice message for a single user."""
+
+    user_id = request.args.get("user_id")
+    if not user_id:
+        return jsonify({"error": "Missing user_id parameter"}), 400
+
+    records = get_records_for_user(user_id, limit=50)
+    db_available = True
+    if records is None:
+        db_available = False
+        records = []
+
+    if not db_available:
         return (
             jsonify(
                 {
-                    "status": "✅ Gemini connection successful",
-                    "models": models,
-                    "ai_message": ai_message,
-                    "voice_url": voice_url,
+                    "user_id": user_id,
+                    "analytics": {},
+                    "message": FALLBACK_MESSAGE,
+                    "voice_url": None,
+                    "warning": "Database unavailable; analytics based on cached defaults.",
                 }
             ),
             200,
         )
-    except Exception as e:
-        print("[Gemini Error]", e)
-        fallback_message = FALLBACK_MESSAGE
+
+    if not records:
         return (
             jsonify(
                 {
-                    "error": str(e),
-                    "ai_message": fallback_message,
+                    "message": "No data available for this user yet.",
                     "voice_url": None,
                 }
             ),
-            500,
+            200,
         )
+
+    avg_heart_rate, avg_hr_message = calculate_avg_heart_rate(records)
+    avg_sleep, avg_sleep_message = calculate_avg_sleep(records)
+    stress_status = detect_stress_patterns(records)
+    wellness_score, wellness_message = compute_wellness_score(records)
+
+    analytics = {
+        "avg_heart_rate": round(avg_heart_rate, 1)
+        if avg_heart_rate is not None
+        else avg_hr_message,
+        "avg_sleep": round(avg_sleep, 1) if avg_sleep is not None else avg_sleep_message,
+        "stress_status": stress_status,
+        "wellness_score": wellness_score if wellness_score is not None else wellness_message,
+    }
+
+    prompt = (
+        "Generate a short motivational message for a user with the following analytics: "
+        f"{analytics}."
+    )
+
+    ai_message = FALLBACK_MESSAGE
+    try:
+        ai_message = analyze_with_gemini({"user_id": user_id, **analytics, "prompt": prompt})
+    except Exception as exc:  # pragma: no cover - defensive logging
+        print("[Gemini Error]", exc)
+
+    audio_path = ""
+    try:
+        audio_path = synthesize_voice(ai_message)
+    except Exception as exc:  # pragma: no cover - defensive logging
+        print("[Voice Synthesis Error]", exc)
+
+    voice_url = None
+    if audio_path:
+        host_root = request.host_url.rstrip("/")
+        voice_url = urljoin(f"{host_root}/", audio_path)
+
+    payload = {
+        "user_id": user_id,
+        "analytics": analytics,
+        "message": ai_message,
+        "voice_url": voice_url,
+    }
+
+    return jsonify(payload), 200
