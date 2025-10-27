@@ -1,64 +1,53 @@
-"""Route definitions for health data ingestion and analytics endpoints."""
+"""Blueprint routes for handling smartwatch health data uploads and retrieval."""
+from __future__ import annotations
+
 from datetime import datetime, timezone
 from typing import Any, Dict
 
 from flask import Blueprint, jsonify, request
 
 from database.db import get_all_records, insert_record
-from models.user_data import SmartwatchData
-from utils.analysis import (
-    calculate_avg_heart_rate,
-    detect_stress_patterns,
-)
 
-# Blueprint responsible for handling smartwatch health data routes.
 health_data_bp = Blueprint("health_data", __name__)
+
+_REQUIRED_FIELDS = [
+    "user_id",
+    "heart_rate",
+    "steps",
+    "stress_level",
+    "sleep_hours",
+]
 
 
 @health_data_bp.route("/upload_data", methods=["POST"])
 def upload_data():
-    """Accept smartwatch data, enrich it with a timestamp, and persist it."""
+    """Accept smartwatch data, validate it, add a timestamp, and persist it."""
     payload: Dict[str, Any] | None = request.get_json(silent=True)
     if payload is None:
-        return jsonify({"error": "Invalid JSON payload."}), 400
+        return jsonify({"error": "Invalid or missing JSON payload."}), 400
 
-    try:
-        # Validate and normalize incoming data using the SmartwatchData model.
-        smartwatch_data = SmartwatchData(**payload)
-    except ValueError as exc:
-        return jsonify({"error": str(exc)}), 400
+    missing_fields = [field for field in _REQUIRED_FIELDS if field not in payload]
+    if missing_fields:
+        return (
+            jsonify({"error": f"Missing required fields: {', '.join(missing_fields)}"}),
+            400,
+        )
 
-    record = smartwatch_data.to_dict()
+    record = {field: payload[field] for field in _REQUIRED_FIELDS}
     record["timestamp"] = datetime.now(timezone.utc).isoformat()
 
-    try:
-        insert_record(record)
-        records = get_all_records()
-    except Exception as exc:  # pragma: no cover - simple demo logging substitute.
-        return jsonify({"error": f"Database operation failed: {exc}"}), 500
+    insert_result = insert_record(record)
+    if insert_result is None:
+        return jsonify({"error": "Failed to save data to the database."}), 500
 
-    response_payload = {
-        "message": "Data received",
-        "total_records": len(records),
-        "analytics": {
-            "average_heart_rate": calculate_avg_heart_rate(records),
-            "stress_alerts": detect_stress_patterns(records),
-        },
-    }
-    return jsonify(response_payload), 201
+    return jsonify({"message": "Data received successfully ✅"}), 200
 
 
-@health_data_bp.route("/analytics", methods=["GET"])
-def analytics():
-    """Provide simple analytics derived from the stored records."""
-    try:
-        records = get_all_records()
-    except Exception as exc:  # pragma: no cover - simple demo logging substitute.
-        return jsonify({"error": f"Database operation failed: {exc}"}), 500
+@health_data_bp.route("/fetch_data", methods=["GET"])
+def fetch_data():
+    """Return all smartwatch data records stored in the database."""
+    records = get_all_records()
+    if records is None:
+        return jsonify({"error": "Failed to fetch data from the database."}), 500
 
-    analytics_payload = {
-        "total_records": len(records),
-        "average_heart_rate": calculate_avg_heart_rate(records),
-        "stress_alerts": detect_stress_patterns(records),
-    }
-    return jsonify(analytics_payload)
+    return jsonify(records), 200
