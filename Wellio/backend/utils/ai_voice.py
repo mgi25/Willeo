@@ -24,7 +24,8 @@ model = genai.GenerativeModel(model_name="models/gemini-1.5-flash")
 def analyze_with_gemini(analytics: dict) -> str:
     """Generate a friendly wellness message using Gemini 1.5 Flash."""
     genai.configure(api_key=os.getenv("GEMINI_API_KEY"))
-    model = genai.GenerativeModel("gemini-1.5-flash")
+    model = genai.GenerativeModel(model_name="models/gemini-1.5-flash")
+
 
     prompt = f"""
     You are Wellio, a friendly smartwatch wellness assistant.
