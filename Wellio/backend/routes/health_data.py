@@ -12,8 +12,8 @@ from utils.analysis import (
     calculate_avg_sleep,
     compute_wellness_score,
     detect_stress_patterns,
-    generate_ai_suggestion,
 )
+from utils.ai_voice import analyze_with_gemini, synthesize_voice
 
 health_data_bp = Blueprint("health_data", __name__)
 
@@ -74,7 +74,9 @@ def fetch_data():
         "wellness_score": wellness_score if wellness_score is not None else wellness_message,
     }
 
-    analytics["ai_suggestion"] = generate_ai_suggestion(analytics)
+    ai_message = analyze_with_gemini(analytics)
+    audio_path = synthesize_voice(ai_message)
+    voice_url = f"http://127.0.0.1:5000/{audio_path}"
 
     user_ids = sorted(
         {str(record.get("user_id")) for record in records_list if record.get("user_id")}
@@ -90,7 +92,8 @@ def fetch_data():
             key: analytics[key]
             for key in ["avg_heart_rate", "avg_sleep", "stress_status", "wellness_score"]
         },
-        "ai_suggestion": analytics["ai_suggestion"],
+        "ai_message": ai_message,
+        "voice_url": voice_url,
     }
 
     return jsonify(response_body), 200
