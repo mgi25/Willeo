@@ -3,7 +3,8 @@ from __future__ import annotations
 
 from pathlib import Path
 
-from flask import Flask
+from flask import Flask, jsonify
+from flask_cors import CORS
 from dotenv import load_dotenv
 
 
@@ -42,14 +43,15 @@ from routes.health_data import health_data_bp
 def create_app() -> Flask:
     """Application factory that sets up the Flask app and registers blueprints."""
     app = Flask(__name__)
+    CORS(app, origins="*")
 
     # Register blueprints for modular route management.
     app.register_blueprint(health_data_bp)
 
-    @app.route("/")
-    def root() -> str:
+    @app.route("/api/status", methods=["GET"])
+    def root() -> tuple:
         """Basic health check endpoint for the Wellio backend."""
-        return "Wellio Backend Running ✅"
+        return jsonify({"status": "Wellio Backend Running ✅"}), 200
 
     return app
 

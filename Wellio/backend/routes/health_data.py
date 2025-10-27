@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 from datetime import datetime, timezone
+from statistics import mean
 from typing import Any, Dict, List
 from urllib.parse import urljoin
 import os
@@ -24,7 +25,7 @@ from utils.ai_voice import (
     list_gemini_models,
 )
 
-health_data_bp = Blueprint("health_data", __name__)
+health_data_bp = Blueprint("health_data", __name__, url_prefix="/api")
 
 _REQUIRED_FIELDS = [
     "user_id",
@@ -35,7 +36,7 @@ _REQUIRED_FIELDS = [
 ]
 
 
-@health_data_bp.route("/upload_data", methods=["POST"])
+@health_data_bp.route("/data/upload", methods=["POST"])
 def upload_data():
     """Accept smartwatch data, validate it, add a timestamp, and persist it."""
     payload: Dict[str, Any] | None = request.get_json(silent=True)
@@ -59,7 +60,7 @@ def upload_data():
     return jsonify({"message": "Data received successfully ✅"}), 200
 
 
-@health_data_bp.route("/fetch_data", methods=["GET"])
+@health_data_bp.route("/data/fetch", methods=["GET"])
 def fetch_data():
     """Return smartwatch records along with derived analytics and insights."""
 
@@ -128,7 +129,7 @@ def fetch_data():
     return jsonify(response_body), 200
 
 
-@health_data_bp.route("/test_gemini", methods=["GET"])
+@health_data_bp.route("/ai/test", methods=["GET"])
 def test_gemini():
     """Test Gemini API connectivity and list available models."""
     load_dotenv()
@@ -176,7 +177,7 @@ def test_gemini():
     return jsonify(payload), 200
 
 
-@health_data_bp.route("/talk", methods=["GET"])
+@health_data_bp.route("/ai/voice", methods=["GET"])
 def talk():
     """Generate a motivational voice message for a single user."""
 
@@ -259,3 +260,76 @@ def talk():
     }
 
     return jsonify(payload), 200
+
+
+@health_data_bp.route("/health", methods=["GET"])
+def get_health() -> tuple:
+    """Return aggregated vitals for dashboard consumption."""
+
+    records = get_all_records()
+    records_list = list(records) if records is not None else []
+
+    avg_heart_rate, avg_hr_message = calculate_avg_heart_rate(records_list)
+    avg_sleep, avg_sleep_message = calculate_avg_sleep(records_list)
+
+    step_values = [
+        float(record.get("steps"))
+        for record in records_list
+        if isinstance(record.get("steps"), (int, float))
+    ]
+    avg_steps = int(round(mean(step_values))) if step_values else None
+
+    stress_values = [
+        float(record.get("stress_level"))
+        for record in records_list
+        if isinstance(record.get("stress_level"), (int, float))
+    ]
+    avg_stress = round(mean(stress_values), 1) if stress_values else None
+
+    payload = {
+        "heart_rate": round(avg_heart_rate, 1) if avg_heart_rate is not None else None,
+        "sleep_hours": round(avg_sleep, 1) if avg_sleep is not None else None,
+        "steps": avg_steps,
+        "stress_level": avg_stress,
+    }
+
+    if not records_list:
+        payload["warning"] = "No records available; showing placeholder vitals."
+        payload.update(
+            {
+                "heart_rate": payload["heart_rate"] or 72,
+                "sleep_hours": payload["sleep_hours"] or 6.5,
+                "steps": payload["steps"] or 8000,
+                "stress_level": payload["stress_level"] or 3,
+            }
+        )
+
+    if payload["heart_rate"] is None:
+        payload["heart_rate_note"] = avg_hr_message
+    if payload["sleep_hours"] is None:
+        payload["sleep_note"] = avg_sleep_message
+    if payload["stress_level"] is None:
+        payload["stress_note"] = detect_stress_patterns(records_list)
+
+    return jsonify(payload), 200
+
+
+@health_data_bp.route("/ai/text", methods=["POST"])
+def ai_text() -> tuple:
+    """Return a Gemini-powered text response for the provided query."""
+
+    payload: Dict[str, Any] | None = request.get_json(silent=True)
+    if payload is None:
+        return jsonify({"error": "Invalid or missing JSON payload."}), 400
+
+    user_query = str(payload.get("query", "")).strip()
+    if not user_query:
+        return jsonify({"error": "Query text is required."}), 400
+
+    try:
+        ai_response = analyze_with_gemini({"query": user_query})
+    except Exception as exc:  # pragma: no cover - defensive logging
+        print("[Gemini Error]", exc)
+        ai_response = FALLBACK_MESSAGE
+
+    return jsonify({"answer": ai_response}), 200
