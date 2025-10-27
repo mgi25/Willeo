@@ -3,7 +3,10 @@ from __future__ import annotations
 
 from datetime import datetime, timezone
 from typing import Any, Dict, List
+import os
 
+from dotenv import load_dotenv
+import google.generativeai as genai
 from flask import Blueprint, jsonify, request
 
 from database.db import get_all_records, insert_record
@@ -97,3 +100,28 @@ def fetch_data():
     }
 
     return jsonify(response_body), 200
+
+
+@health_data_bp.route("/test_gemini", methods=["GET"])
+def test_gemini():
+    """Test Gemini API connectivity and list available models."""
+    load_dotenv()
+    api_key = os.getenv("GEMINI_API_KEY")
+
+    if not api_key:
+        return jsonify({"error": "❌ GEMINI_API_KEY missing in .env"}), 500
+
+    genai.configure(api_key=api_key)
+
+    try:
+        models = []
+        for m in genai.list_models():
+            if "generateContent" in m.supported_generation_methods:
+                models.append(m.name)
+
+        return jsonify({
+            "status": "✅ Gemini connection successful",
+            "models": models
+        }), 200
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
