@@ -1,11 +1,24 @@
 """Utilities for generating AI-driven voice messages for Wellio."""
 from __future__ import annotations
 
+from dotenv import load_dotenv
 import os
-from datetime import datetime
-
-from gtts import gTTS
 import google.generativeai as genai
+from datetime import datetime
+from gtts import gTTS
+
+# Load .env
+load_dotenv()
+api_key = os.getenv("GEMINI_API_KEY")
+
+if not api_key:
+    raise ValueError("❌ GEMINI_API_KEY missing in .env — please add it.")
+
+genai.configure(api_key=api_key)
+print("✅ Gemini API Key loaded successfully")
+
+# Example model usage
+model = genai.GenerativeModel(model_name="models/gemini-1.5-flash")
 
 
 def analyze_with_gemini(analytics: dict) -> str:
