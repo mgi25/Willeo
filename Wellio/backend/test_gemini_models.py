@@ -1,38 +1,34 @@
-from dotenv import load_dotenv
-import google.generativeai as genai
-import os
+"""Utility script to list available Gemini models for debugging."""
+from __future__ import annotations
+
 import json
-
-load_dotenv()
-api_key = os.getenv("GEMINI_API_KEY")
-
-if not api_key:
-    raise ValueError("❌ GEMINI_API_KEY not found in .env file")
-
-genai.configure(api_key=api_key)
-
-models = []
-for m in genai.list_models():
-    if "generateContent" in m.supported_generation_methods:
-        models.append(m.name)
-
-print("✅ Available Gemini Models:")
-print(json.dumps(models, indent=2))
+import os
 
 from dotenv import load_dotenv
-import google.generativeai as genai
-import os
-import json
 
-load_dotenv()
-api_key = os.getenv("GEMINI_API_KEY")
+try:
+    import google.generativeai as genai
+except ImportError as exc:  # pragma: no cover - diagnostics only
+    raise SystemExit(f"google-generativeai package is required: {exc}")
 
-if not api_key:
-    raise ValueError("❌ GEMINI_API_KEY not found in .env file")
 
-genai.configure(api_key=api_key)
+def main() -> None:
+    load_dotenv()
+    api_key = os.getenv("GEMINI_API_KEY")
 
-models = []
-for m in genai.list_models():
-    if "generateContent" in m.supported_generation_methods:
-        print(" -", m.name)
+    if not api_key:
+        print("❌ Missing GEMINI_API_KEY in .env")
+        return
+
+    genai.configure(api_key=api_key)
+
+    models = [
+        m.name for m in genai.list_models() if "generateContent" in m.supported_generation_methods
+    ]
+
+    print("✅ Available Gemini Models:")
+    print(json.dumps(models, indent=2))
+
+
+if __name__ == "__main__":
+    main()
