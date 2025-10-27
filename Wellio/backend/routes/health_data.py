@@ -262,7 +262,7 @@ def talk():
     return jsonify(payload), 200
 
 
-@health_data_bp.route("/health", methods=["GET"])
+@health_data_bp.route("/health/summary", methods=["GET"])
 def get_health() -> tuple:
     """Return aggregated vitals for dashboard consumption."""
 
@@ -314,7 +314,7 @@ def get_health() -> tuple:
     return jsonify(payload), 200
 
 
-@health_data_bp.route("/ai/text", methods=["POST"])
+@health_data_bp.route("/ai/text/insights", methods=["POST"])
 def ai_text() -> tuple:
     """Return a Gemini-powered text response for the provided query."""
 

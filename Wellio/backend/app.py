@@ -3,7 +3,7 @@ from __future__ import annotations
 
 from pathlib import Path
 
-from flask import Flask, jsonify
+from flask import Flask, jsonify, request
 from flask_cors import CORS
 from dotenv import load_dotenv
 
@@ -21,7 +21,7 @@ def _log_environment_safety() -> None:
     ]
 
     try:
-        content = gitignore_path.read_text()
+        content = gitignore_path.read_text(encoding="utf-8", errors="ignore")
     except FileNotFoundError:
         print("⚠️ .gitignore not found; please ensure environment safety manually.")
         return
@@ -38,6 +38,7 @@ _log_environment_safety()
 
 # Import the blueprint that contains health data routes.
 from routes.health_data import health_data_bp
+from utils.ai_voice import gemini_respond
 
 
 def create_app() -> Flask:
@@ -48,10 +49,37 @@ def create_app() -> Flask:
     # Register blueprints for modular route management.
     app.register_blueprint(health_data_bp)
 
-    @app.route("/api/status", methods=["GET"])
-    def root() -> tuple:
-        """Basic health check endpoint for the Wellio backend."""
-        return jsonify({"status": "Wellio Backend Running ✅"}), 200
+    @app.route("/", methods=["GET"])
+    def home() -> str:
+        """Provide a default message confirming the backend is reachable."""
+        return "✅ Wellio backend is running. Try /api/health or /api/ai/text."
+
+    @app.route("/api/health", methods=["GET"])
+    def get_health() -> tuple:
+        """Return a sample set of wellness metrics for quick health checks."""
+
+        data = {
+            "heart_rate": 75,
+            "sleep_hours": 7.2,
+            "steps": 8200,
+            "stress_level": 2,
+        }
+
+        return jsonify(data), 200
+
+    @app.route("/api/ai/text", methods=["POST"])
+    def ai_text() -> tuple:
+        """Generate a Gemini powered response for the supplied query text."""
+
+        payload = request.get_json(silent=True) or {}
+        query = str(payload.get("query", "")).strip()
+
+        if not query:
+            return jsonify({"error": "Query text is required."}), 400
+
+        response_text = gemini_respond(query)
+
+        return jsonify({"answer": response_text}), 200
 
     return app
 

@@ -122,3 +122,14 @@ def list_gemini_models() -> List[str]:
     except Exception as exc:
         print("[Gemini Error] Unable to list models:", exc)
         return []
+
+
+def gemini_respond(query: str) -> str:
+    """Generate a conversational response for a free-form query."""
+
+    sanitized_query = query.strip()
+    if not sanitized_query:
+        return FALLBACK_MESSAGE
+
+    payload = {"query": sanitized_query}
+    return analyze_with_gemini(payload)
