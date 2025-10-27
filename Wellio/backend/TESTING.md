@@ -79,3 +79,47 @@ curl http://127.0.0.1:5000/fetch_data
 - **Common tooling differences:**
   - PowerShell requires escaping double quotes inside JSON payloads; backticks (`\``) are used for line continuation.
   - `curl` on Linux/macOS uses backslashes (`\`) for line continuation and does not require escaping inner double quotes in single-quoted JSON.
+
+## Analytics JSON Preview
+
+Once multiple smartwatch entries are stored, `GET /fetch_data` responds with both raw records and computed insights:
+
+```json
+{
+  "records": [
+    {
+      "user_id": "U001",
+      "heart_rate": 75,
+      "steps": 3200,
+      "stress_level": 2,
+      "sleep_hours": 7.2,
+      "timestamp": "2024-05-24T10:42:11.123456"
+    },
+    {
+      "user_id": "U001",
+      "heart_rate": 88,
+      "steps": 4800,
+      "stress_level": 3,
+      "sleep_hours": 6.0,
+      "timestamp": "2024-05-24T21:19:44.654321"
+    },
+    {
+      "user_id": "U001",
+      "heart_rate": 92,
+      "steps": 5100,
+      "stress_level": 4,
+      "sleep_hours": 5.5,
+      "timestamp": "2024-05-25T07:10:04.789654"
+    }
+  ],
+  "analytics": {
+    "avg_heart_rate": 85.0,
+    "avg_sleep": 6.2,
+    "stress_status": "High Stress ⚠️ More than half of entries show elevated stress.",
+    "wellness_score": 56
+  },
+  "ai_suggestion": "You seem slightly stressed. Try a 5-minute deep breathing exercise."
+}
+```
+
+Use this sample to validate that analytics and placeholder AI suggestions are serialized correctly.
