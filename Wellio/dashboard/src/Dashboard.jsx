@@ -8,7 +8,7 @@ export default function Dashboard() {
   const [reply, setReply] = useState("");
   const [loadingAI, setLoadingAI] = useState(false);
 
-  // Fetch health data
+  // Load health data
   useEffect(() => {
     async function load() {
       try {
@@ -23,7 +23,6 @@ export default function Dashboard() {
     load();
   }, []);
 
-  // Ask AI
   async function handleAsk() {
     setLoadingAI(true);
     try {
@@ -49,7 +48,7 @@ export default function Dashboard() {
     >
       <h1 style={{ fontSize: "1.5rem", marginBottom: "1rem" }}>Wellio Dashboard</h1>
 
-      {/* Vitals */}
+      {/* Health Section */}
       <section
         style={{
           background: "#1e2537",
@@ -78,7 +77,7 @@ export default function Dashboard() {
         )}
       </section>
 
-      {/* Ask AI */}
+      {/* AI Assistant Section */}
       <section
         style={{
           background: "#1e2537",
