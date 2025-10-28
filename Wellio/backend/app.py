@@ -67,9 +67,19 @@ def create_app() -> Flask:
 
         return jsonify(data), 200
 
-    @app.route("/api/ai/text", methods=["POST"])
+    @app.route("/api/ai/text", methods=["GET", "POST"])
     def ai_text() -> tuple:
         """Generate a Gemini powered response for the supplied query text."""
+
+        if request.method == "GET":
+            return (
+                jsonify(
+                    {
+                        "message": "Use POST with JSON body {'query': '<your text>'} to get AI response.",
+                    }
+                ),
+                200,
+            )
 
         payload = request.get_json(silent=True) or {}
         query = str(payload.get("query", "")).strip()
