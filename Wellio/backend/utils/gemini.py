@@ -13,7 +13,7 @@ genai.configure(api_key=api_key)
 def get_ai_reply(prompt: str):
     """Generate a conversational reply from Gemini-Pro."""
     try:
-        model = genai.GenerativeModel("gemini-pro")
+        model = genai.GenerativeModel("gemini-1.5-pro-latest")
         response = model.generate_content(prompt)
 
         # Return text safely
