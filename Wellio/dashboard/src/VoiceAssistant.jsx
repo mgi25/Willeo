@@ -1,7 +1,53 @@
 import { useState, useRef, useEffect, useMemo } from "react";
 import { askAssistant } from "./api";
-import { Mic, Send, Bot, Sparkles } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
+
+const iconProps = {
+  xmlns: "http://www.w3.org/2000/svg",
+  width: 24,
+  height: 24,
+  viewBox: "0 0 24 24",
+  fill: "none",
+  stroke: "currentColor",
+  strokeWidth: 1.5,
+  strokeLinecap: "round",
+  strokeLinejoin: "round",
+};
+
+const Mic = (props) => (
+  <svg {...iconProps} {...props}>
+    <path d="M12 15a3 3 0 0 0 3-3V6a3 3 0 0 0-6 0v6a3 3 0 0 0 3 3Z" />
+    <path d="M19 10a7 7 0 0 1-14 0" />
+    <path d="M12 19v3" />
+    <path d="M8 22h8" />
+  </svg>
+);
+
+const Send = (props) => (
+  <svg {...iconProps} {...props}>
+    <path d="m22 2-9.5 9.5" />
+    <path d="m22 2-7 20-4-9-9-4Z" />
+  </svg>
+);
+
+const Bot = (props) => (
+  <svg {...iconProps} {...props}>
+    <path d="M12 4V2" />
+    <path d="M8 2h8" />
+    <rect width="16" height="12" x="4" y="6" rx="2" />
+    <path d="M2 14h20" />
+    <circle cx="9" cy="10" r="1.25" />
+    <circle cx="15" cy="10" r="1.25" />
+  </svg>
+);
+
+const Sparkles = (props) => (
+  <svg {...iconProps} {...props}>
+    <path d="M6 4 7.2 8 11 9.5 7.2 11 6 15 4.8 11 1 9.5 4.8 8Z" />
+    <path d="M18 6 18.6 7.8 20.4 8.4 18.6 9 18 10.8 17.4 9 15.6 8.4 17.4 7.8Z" />
+    <path d="M12 15 12.6 17.2 14.8 17.8 12.6 18.4 12 20.6 11.4 18.4 9.2 17.8 11.4 17.2Z" />
+  </svg>
+);
 
 const initialMessage = {
   id: "intro",
