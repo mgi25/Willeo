@@ -7,15 +7,15 @@ import os
 import atexit
 from typing import List, Optional
 
-from dotenv import load_dotenv
 from gtts import gTTS
 import google.generativeai as genai
 import requests
+from utils.env_loader import load_environment
 
 GENAI_MODEL_NAME = "models/gemini-2.5-flash"
 FALLBACK_MESSAGE = "I'm having trouble connecting right now, but you're doing great!"
 
-load_dotenv()
+load_environment()
 
 _model: Optional[genai.GenerativeModel] = None
 _executor = ThreadPoolExecutor(max_workers=4)

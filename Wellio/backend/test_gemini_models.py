@@ -4,7 +4,7 @@ from __future__ import annotations
 import json
 import os
 
-from dotenv import load_dotenv
+from utils.env_loader import load_environment
 
 try:
     import google.generativeai as genai
@@ -13,7 +13,7 @@ except ImportError as exc:  # pragma: no cover - diagnostics only
 
 
 def main() -> None:
-    load_dotenv()
+    load_environment()
     api_key = os.getenv("GEMINI_API_KEY")
 
     if not api_key:
