@@ -8,22 +8,16 @@ export async function getHealthData() {
 
 export async function askAssistant(query) {
   try {
-    const response = await fetch(`${API_BASE}/api/ai/text`, {
+    const response = await fetch("http://127.0.0.1:5000/api/ai/text", {
       method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-      },
+      headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ query }),
     });
 
-    if (!response.ok) {
-      throw new Error(`Server error: ${response.status}`);
-    }
-
     const data = await response.json();
     return data.reply || "No response received from AI.";
-  } catch (err) {
-    console.error("Error contacting Wellio backend:", err);
-    return "Sorry, I’m having trouble connecting to my AI core.";
+  } catch (error) {
+    console.error("Error contacting backend:", error);
+    return "There was an issue connecting to Wellio’s AI brain.";
   }
 }

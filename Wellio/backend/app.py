@@ -1,46 +1,38 @@
-from flask import Flask, jsonify, request
+from flask import Flask, request, jsonify
 from flask_cors import CORS
+from dotenv import load_dotenv
+from utils.gemini import get_ai_reply
+import os
+
+# Load environment variables
+load_dotenv()
 
 app = Flask(__name__)
-CORS(app, origins="*")  # allow frontend access
+CORS(app)
 
-# ---- Mock Gemini Logic ----
-def gemini_respond(query: str):
-    if not query:
-        return "Please provide a question."
-    return f"AI analysis: Based on your input '{query}', your vitals look stable and healthy!"
+@app.route("/api/ai/text", methods=["POST"])
+def chat_with_ai():
+    try:
+        data = request.get_json()
+        query = data.get("query", "").strip()
 
-# ---- Default Root ----
-@app.route("/")
-def home():
-    return "✅ Wellio backend is running. Try /api/health or /api/ai/text."
+        if not query:
+            return jsonify({"reply": "Please type something for me to respond to."}), 400
 
-# ---- Health Endpoint ----
-@app.route("/api/health", methods=["GET"])
-def get_health():
-    data = {
-        "heart_rate": 74,
-        "sleep_hours": 7.1,
-        "steps": 8200,
-        "stress_level": 3
-    }
-    return jsonify(data)
+        print(f"🧠 User asked: {query}")
 
-# ---- AI Text Endpoint ----
-@app.route("/api/ai/text", methods=["GET", "POST"])
-def ai_text():
-    if request.method == "GET":
-        return jsonify({
-            "message": "Use POST with JSON body {'query': '<your text>'} to get AI response."
-        })
-    
-    body = request.get_json(silent=True) or {}
-    query = body.get("query", "")
-    if not query:
-        return jsonify({"error": "Missing 'query' field"}), 400
+        ai_response = get_ai_reply(query)
 
-    response = gemini_respond(query)
-    return jsonify({"answer": response})
+        if not ai_response:
+            return jsonify({"reply": "AI did not return any response."}), 500
+
+        print(f"✨ AI replied: {ai_response[:120]}...")
+        return jsonify({"reply": ai_response})
+
+    except Exception as e:
+        print("❌ Backend error:", e)
+        return jsonify({"reply": f"Server error: {str(e)}"}), 500
+
 
 if __name__ == "__main__":
     app.run(host="0.0.0.0", port=5000, debug=True)
