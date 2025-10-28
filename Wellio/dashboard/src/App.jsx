@@ -1,5 +1,4 @@
-import Dashboard from "./Dashboard";
-
+import VoiceAssistant from "./VoiceAssistant";
 export default function App() {
-  return <Dashboard />;
+  return <VoiceAssistant />;
 }
