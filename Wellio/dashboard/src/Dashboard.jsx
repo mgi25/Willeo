@@ -26,11 +26,11 @@ export default function Dashboard() {
   async function handleAsk() {
     setLoadingAI(true);
     try {
-      const data = await askAssistant(question);
-      setReply(data.answer);
+      const aiReply = await askAssistant(question);
+      setReply(aiReply);
     } catch (err) {
       console.error(err);
-      setReply("Error talking to AI.");
+      setReply("⚠️ There was an issue connecting to Wellio’s brain.");
     } finally {
       setLoadingAI(false);
     }
