@@ -1,3 +1,5 @@
+"""Lightweight sentiment and emotion analysis helpers."""
+
 from transformers import pipeline
 
 _sentiment_pipe = None
@@ -7,7 +9,11 @@ _emotion_pipe = None
 def get_sentiment_pipe():
     global _sentiment_pipe
     if _sentiment_pipe is None:
-        _sentiment_pipe = pipeline("sentiment-analysis")
+        _sentiment_pipe = pipeline(
+            "sentiment-analysis",
+            model="distilbert/distilbert-base-uncased-finetuned-sst-2-english",
+            framework="pt",
+        )
     return _sentiment_pipe
 
 
@@ -18,6 +24,7 @@ def get_emotion_pipe():
             "text-classification",
             model="j-hartmann/emotion-english-distilroberta-base",
             top_k=None,
+            framework="pt",
         )
     return _emotion_pipe
 
