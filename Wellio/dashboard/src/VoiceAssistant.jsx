@@ -1,28 +1,49 @@
-import { useState, useRef, useEffect } from "react";
+import { useState, useRef, useEffect, useMemo } from "react";
 import { askAssistant } from "./api";
+import { Mic, Send, Bot, Sparkles } from "lucide-react";
+import { motion, AnimatePresence } from "framer-motion";
+
+const initialMessage = {
+  id: "intro",
+  sender: "ai",
+  text: "Hello, I'm Wellio — your voice companion. How are you feeling today?",
+};
 
 export default function VoiceAssistant() {
-  const [messages, setMessages] = useState([
-    {
-      sender: "ai",
-      text: "Hello, I'm Wellio — your personal voice assistant. How are you feeling today?",
-    },
-  ]);
+  const [messages, setMessages] = useState([initialMessage]);
   const [input, setInput] = useState("");
   const [listening, setListening] = useState(false);
+  const [speaking, setSpeaking] = useState(false);
   const [loading, setLoading] = useState(false);
   const recognitionRef = useRef(null);
   const chatEndRef = useRef(null);
 
   useEffect(() => {
     chatEndRef.current?.scrollIntoView({ behavior: "smooth" });
-  }, [messages]);
+  }, [messages, loading]);
+
+  useEffect(() => () => {
+    if (recognitionRef.current) {
+      recognitionRef.current.onend = null;
+      recognitionRef.current.stop();
+    }
+    if ("speechSynthesis" in window) {
+      window.speechSynthesis.cancel();
+    }
+  }, []);
+
+  const createMessage = (sender, text) => ({
+    id: `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
+    sender,
+    text,
+  });
 
   function startListening() {
     if (!("webkitSpeechRecognition" in window)) {
       alert("Speech recognition not supported in this browser.");
       return;
     }
+
     const recognition = new window.webkitSpeechRecognition();
     recognition.lang = "en-US";
     recognition.interimResults = false;
@@ -30,151 +51,281 @@ export default function VoiceAssistant() {
     recognitionRef.current = recognition;
 
     recognition.onstart = () => setListening(true);
+    recognition.onend = () => setListening(false);
+    recognition.onerror = () => setListening(false);
     recognition.onresult = (event) => {
       const transcript = event.results[0][0].transcript;
-      setInput(transcript);
       sendMessage(transcript);
     };
-    recognition.onend = () => setListening(false);
+
     recognition.start();
   }
 
   function speak(text) {
-    if (!window.speechSynthesis) return;
+    if (!("speechSynthesis" in window)) return;
+
+    window.speechSynthesis.cancel();
     const utterance = new SpeechSynthesisUtterance(text);
-    utterance.rate = 1;
-    utterance.pitch = 1;
     utterance.lang = "en-US";
+    utterance.pitch = 1;
+    utterance.rate = 1;
+    utterance.onstart = () => setSpeaking(true);
+    utterance.onend = () => setSpeaking(false);
+    utterance.onerror = () => setSpeaking(false);
     window.speechSynthesis.speak(utterance);
   }
 
   async function sendMessage(content) {
-    if (!content.trim()) return;
-    setMessages((m) => [...m, { sender: "user", text: content }]);
+    const trimmed = content.trim();
+    if (!trimmed) return;
+
+    const userMessage = createMessage("user", trimmed);
+    setMessages((prev) => [...prev, userMessage]);
     setInput("");
     setLoading(true);
 
     try {
-      const res = await askAssistant(content);
-      const aiReply = res.answer || "I'm here, but something went wrong.";
-      setMessages((m) => [...m, { sender: "ai", text: aiReply }]);
-      speak(aiReply);
-    } catch (err) {
-      console.error(err);
-      setMessages((m) => [...m, { sender: "ai", text: "Sorry, I had trouble processing that." }]);
+      const res = await askAssistant(trimmed);
+      const reply = res.answer?.trim() || "I'm here, tell me more.";
+      const aiMessage = createMessage("ai", reply);
+      setMessages((prev) => [...prev, aiMessage]);
+      speak(reply);
+    } catch (error) {
+      console.error(error);
+      const fallback = createMessage("ai", "Sorry, I didn’t quite catch that.");
+      setMessages((prev) => [...prev, fallback]);
     } finally {
       setLoading(false);
     }
   }
 
-  return (
-    <div
-      style={{
-        display: "flex",
-        flexDirection: "column",
-        height: "100vh",
-        background: "#0f172a",
-        color: "#fff",
-        fontFamily: "Inter, system-ui, sans-serif",
-      }}
-    >
-      <header
-        style={{
-          padding: "1rem",
-          fontSize: "1.25rem",
-          fontWeight: 600,
-          borderBottom: "1px solid #1e293b",
-        }}
-      >
-        🎙️ Wellio Voice Chat
-      </header>
+  const statusText = listening ? "Listening..." : speaking ? "Speaking..." : "Here with you";
 
-      <main style={{ flex: 1, overflowY: "auto", padding: "1rem" }}>
-        {messages.map((msg, idx) => (
-          <div
-            key={idx}
-            style={{
-              display: "flex",
-              justifyContent: msg.sender === "user" ? "flex-end" : "flex-start",
-              marginBottom: "0.5rem",
-            }}
-          >
-            <div
-              style={{
-                background: msg.sender === "user" ? "#4f46e5" : "#1e2537",
-                color: "#fff",
-                padding: "0.75rem 1rem",
-                borderRadius: "1rem",
-                maxWidth: "75%",
-                whiteSpace: "pre-wrap",
-                lineHeight: 1.4,
-              }}
-            >
-              {msg.text}
+  const orbAnimation = useMemo(() => {
+    if (listening) {
+      return {
+        scale: [1, 1.18, 1],
+        boxShadow: [
+          "0 0 40px rgba(99,102,241,0.45)",
+          "0 0 70px rgba(129,140,248,0.55)",
+          "0 0 40px rgba(99,102,241,0.45)",
+        ],
+        opacity: [0.9, 1, 0.9],
+      };
+    }
+
+    if (speaking) {
+      return {
+        scale: [1, 1.12, 1],
+        boxShadow: [
+          "0 0 30px rgba(59,130,246,0.4)",
+          "0 0 55px rgba(129,140,248,0.45)",
+          "0 0 30px rgba(59,130,246,0.4)",
+        ],
+        opacity: [0.85, 1, 0.85],
+      };
+    }
+
+    return {
+      scale: [1, 1.05, 1],
+      boxShadow: [
+        "0 0 25px rgba(99,102,241,0.35)",
+        "0 0 45px rgba(99,102,241,0.25)",
+        "0 0 25px rgba(99,102,241,0.35)",
+      ],
+      opacity: [0.8, 1, 0.8],
+    };
+  }, [listening, speaking]);
+
+  const orbTransition = useMemo(
+    () => ({
+      duration: listening ? 1.4 : speaking ? 1.8 : 3.5,
+      repeat: Infinity,
+      ease: "easeInOut",
+    }),
+    [listening, speaking],
+  );
+
+  const handleSubmit = (event) => {
+    event.preventDefault();
+    sendMessage(input);
+  };
+
+  return (
+    <div className="relative min-h-screen overflow-hidden">
+      <div className="pointer-events-none absolute inset-0">
+        <div className="absolute -left-24 top-0 h-96 w-96 rounded-full bg-primary/20 blur-[140px]" />
+        <div className="absolute bottom-0 right-0 h-[420px] w-[420px] rounded-full bg-purple-500/10 blur-[160px]" />
+        <div className="absolute left-1/2 top-1/3 h-64 w-64 -translate-x-1/2 rounded-full bg-cyan-400/10 blur-[120px]" />
+      </div>
+
+      <div className="relative z-10 mx-auto flex min-h-screen max-w-6xl flex-col px-4 py-8 sm:px-8">
+        <header className="flex flex-col gap-6 rounded-3xl border border-white/10 bg-white/5 p-6 backdrop-blur-2xl sm:flex-row sm:items-center sm:justify-between sm:p-8">
+          <div className="flex items-start gap-4 text-slate-100">
+            <div className="rounded-2xl bg-white/10 p-3">
+              <Bot className="h-6 w-6 text-indigo-300" />
+            </div>
+            <div>
+              <p className="text-sm uppercase tracking-[0.3em] text-indigo-200/70">Wellio Voice Chat v2.0</p>
+              <h1 className="mt-2 text-2xl font-semibold text-white md:text-3xl">Your cinematic AI companion</h1>
+              <p className="mt-3 max-w-xl text-sm text-slate-300 sm:text-base">
+                Share what&apos;s on your mind and Wellio will listen, respond, and speak back with warmth and clarity.
+              </p>
             </div>
           </div>
-        ))}
-        {loading && (
-          <div style={{ textAlign: "left", color: "#94a3b8", fontStyle: "italic" }}>
-            Wellio is thinking...
-          </div>
-        )}
-        <div ref={chatEndRef}></div>
-      </main>
 
-      <footer
-        style={{
-          display: "flex",
-          alignItems: "center",
-          gap: "0.5rem",
-          borderTop: "1px solid #1e293b",
-          padding: "0.75rem",
-          background: "#1e2537",
-        }}
-      >
-        <button
-          onClick={startListening}
-          style={{
-            background: listening ? "#22c55e" : "#4f46e5",
-            border: "none",
-            borderRadius: "50%",
-            width: "40px",
-            height: "40px",
-            cursor: "pointer",
-          }}
-          title="Start voice input"
-        >
-          🎤
-        </button>
-        <input
-          value={input}
-          onChange={(e) => setInput(e.target.value)}
-          placeholder="Type or speak your question..."
-          style={{
-            flex: 1,
-            borderRadius: "1rem",
-            border: "1px solid #334155",
-            padding: "0.5rem 1rem",
-            background: "#0f172a",
-            color: "#fff",
-          }}
-          onKeyDown={(e) => e.key === "Enter" && sendMessage(input)}
-        />
-        <button
-          onClick={() => sendMessage(input)}
-          disabled={loading}
-          style={{
-            background: "#4f46e5",
-            color: "#fff",
-            borderRadius: "0.75rem",
-            padding: "0.5rem 0.75rem",
-            border: "none",
-            cursor: "pointer",
-          }}
-        >
-          {loading ? "..." : "Send"}
-        </button>
-      </footer>
+          <div className="flex flex-col items-center gap-3">
+            <motion.div
+              className="relative flex h-32 w-32 items-center justify-center rounded-full bg-gradient-to-br from-indigo-400 via-purple-500 to-cyan-400 shadow-[0_0_60px_rgba(99,102,241,0.35)]"
+              animate={orbAnimation}
+              transition={orbTransition}
+            >
+              <motion.div
+                className="absolute inset-2 rounded-full bg-slate-950/40 backdrop-blur-2xl"
+                animate={{
+                  opacity: listening ? [0.4, 0.7, 0.4] : [0.3, 0.5, 0.3],
+                  scale: listening ? [1, 1.1, 1] : [1, 1.05, 1],
+                }}
+                transition={{ duration: listening ? 1.2 : 2.6, repeat: Infinity, ease: "easeInOut" }}
+              />
+              <motion.div
+                className="relative flex h-24 w-24 items-center justify-center rounded-full bg-white/10"
+                animate={{
+                  scale: speaking ? [1, 1.1, 1] : listening ? [1, 1.08, 1] : [1, 1.04, 1],
+                  opacity: [0.9, 1, 0.9],
+                }}
+                transition={{ duration: speaking ? 1.4 : listening ? 1.2 : 2.4, repeat: Infinity, ease: "easeInOut" }}
+              >
+                <Sparkles className="h-10 w-10 text-indigo-100 drop-shadow-lg" />
+              </motion.div>
+            </motion.div>
+            <motion.span
+              key={statusText}
+              initial={{ opacity: 0, y: 8 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ duration: 0.4 }}
+              className="text-sm font-medium uppercase tracking-[0.35em] text-indigo-200/70"
+            >
+              {statusText}
+            </motion.span>
+          </div>
+        </header>
+
+        <section className="mt-6 flex flex-1 flex-col overflow-hidden rounded-3xl border border-white/10 bg-white/5 backdrop-blur-2xl">
+          <div className="flex-1 overflow-y-auto px-4 py-6 sm:px-8">
+            <div className="mx-auto flex w-full max-w-3xl flex-col space-y-4">
+              <AnimatePresence initial={false}>
+                {messages.map((msg) => (
+                  <motion.div
+                    key={msg.id}
+                    initial={{ opacity: 0, y: 16, scale: 0.98 }}
+                    animate={{ opacity: 1, y: 0, scale: 1 }}
+                    exit={{ opacity: 0, y: -10, scale: 0.95 }}
+                    transition={{ duration: 0.35, ease: "easeOut" }}
+                    className={`flex ${msg.sender === "user" ? "justify-end" : "justify-start"}`}
+                  >
+                    <div
+                      className={`relative max-w-[85%] rounded-3xl px-5 py-4 text-sm leading-relaxed shadow-glow sm:text-base ${
+                        msg.sender === "user"
+                          ? "bg-gradient-to-br from-indigo-500 via-purple-500 to-blue-500 text-white"
+                          : "bg-white/10 text-slate-100 backdrop-blur-xl"
+                      }`}
+                    >
+                      {msg.sender === "ai" && (
+                        <span className="mb-2 flex items-center gap-2 text-xs uppercase tracking-[0.25em] text-indigo-200/70">
+                          <span className="inline-flex h-2 w-2 rounded-full bg-indigo-300" />
+                          Wellio
+                        </span>
+                      )}
+                      <span>{msg.text}</span>
+                    </div>
+                  </motion.div>
+                ))}
+              </AnimatePresence>
+
+              <AnimatePresence>
+                {loading && (
+                  <motion.div
+                    key="typing-indicator"
+                    initial={{ opacity: 0, y: 12 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    exit={{ opacity: 0, y: -12 }}
+                    transition={{ duration: 0.3 }}
+                    className="flex items-center gap-3 text-indigo-100/80"
+                  >
+                    <div className="flex h-9 w-16 items-center justify-center rounded-full border border-white/10 bg-white/10 backdrop-blur-xl">
+                      {[0, 1, 2].map((i) => (
+                        <motion.span
+                          key={i}
+                          className="h-2 w-2 rounded-full bg-indigo-200"
+                          animate={{ y: [0, -6, 0], opacity: [0.6, 1, 0.6] }}
+                          transition={{ duration: 0.9, repeat: Infinity, delay: i * 0.15, ease: "easeInOut" }}
+                        />
+                      ))}
+                    </div>
+                    <span className="text-sm uppercase tracking-[0.3em] text-indigo-200/70">Responding</span>
+                  </motion.div>
+                )}
+              </AnimatePresence>
+              <div ref={chatEndRef} />
+            </div>
+          </div>
+
+          <form onSubmit={handleSubmit} className="border-t border-white/10 bg-white/5/60 px-4 py-4 backdrop-blur-xl sm:px-8">
+            <div className="mx-auto flex w-full max-w-3xl flex-col gap-3 sm:flex-row sm:items-center">
+              <motion.button
+                type="button"
+                onClick={startListening}
+                whileTap={{ scale: 0.94 }}
+                animate={
+                  listening
+                    ? {
+                        boxShadow: [
+                          "0 0 0 rgba(99,102,241,0.4)",
+                          "0 0 36px rgba(129,140,248,0.75)",
+                          "0 0 0 rgba(99,102,241,0.4)",
+                        ],
+                        scale: [1, 1.12, 1],
+                      }
+                    : { scale: 1, boxShadow: "0 0 0 rgba(0,0,0,0)" }
+                }
+                transition={{ duration: listening ? 1.4 : 0.3, repeat: listening ? Infinity : 0, ease: "easeInOut" }}
+                className={`flex h-12 w-12 items-center justify-center rounded-full border border-white/10 bg-white/10 text-white transition hover:bg-white/20 ${
+                  listening ? "border-indigo-300 text-indigo-100" : ""
+                }`}
+                aria-pressed={listening}
+                title="Speak with Wellio"
+              >
+                <Mic className="h-5 w-5" />
+              </motion.button>
+
+              <div className="flex w-full flex-1 items-center gap-3 rounded-full border border-white/10 bg-white/10 px-4 py-2 backdrop-blur-xl focus-within:border-indigo-300 focus-within:bg-white/20">
+                <input
+                  className="w-full bg-transparent text-sm text-white placeholder:text-slate-400 focus:outline-none sm:text-base"
+                  placeholder="Speak or type your message..."
+                  value={input}
+                  onChange={(event) => setInput(event.target.value)}
+                  onKeyDown={(event) => {
+                    if (event.key === "Enter" && !event.shiftKey) {
+                      event.preventDefault();
+                      sendMessage(input);
+                    }
+                  }}
+                  aria-label="Message Wellio"
+                />
+                <motion.button
+                  type="submit"
+                  whileTap={{ scale: 0.96 }}
+                  disabled={loading}
+                  className="flex h-10 w-10 items-center justify-center rounded-full bg-gradient-to-r from-indigo-500 via-purple-500 to-cyan-400 text-white shadow-glow transition focus:outline-none focus:ring-2 focus:ring-indigo-300 disabled:opacity-60"
+                >
+                  <Send className="h-4 w-4" />
+                </motion.button>
+              </div>
+            </div>
+          </form>
+        </section>
+      </div>
     </div>
   );
 }
