@@ -4,12 +4,12 @@ from __future__ import annotations
 import os
 from typing import Any, Dict, List, Optional
 
-from dotenv import load_dotenv
+from utils.env_loader import load_environment
 from pymongo import MongoClient
 from pymongo.collection import Collection
 
 # Load environment variables so the MongoDB URI is available when this module is imported.
-load_dotenv()
+load_environment()
 
 _MONGO_URI = os.getenv("MONGO_URI", "mongodb://localhost:27017/")
 _DB_NAME = "wellio"

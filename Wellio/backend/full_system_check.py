@@ -3,14 +3,15 @@ import os
 from typing import Dict, Tuple
 
 import requests
-from dotenv import load_dotenv
+
+from utils.env_loader import load_environment
 
 from utils.ai_voice import analyze_with_gemini, list_gemini_models, synthesize_voice
 
 print("🩺 Running Wellio Full System Health Check...\n")
 
 # --- 1️⃣ Load environment variables ---
-load_dotenv()
+load_environment()
 api_key = os.getenv("GEMINI_API_KEY")
 mongo_uri = os.getenv("MONGO_URI")
 

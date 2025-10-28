@@ -7,7 +7,6 @@ from typing import Any, Dict, List
 from urllib.parse import urljoin
 import os
 
-from dotenv import load_dotenv
 import google.generativeai as genai
 from flask import Blueprint, jsonify, request
 
@@ -24,6 +23,9 @@ from utils.ai_voice import (
     synthesize_voice,
     list_gemini_models,
 )
+from utils.env_loader import load_environment
+
+load_environment()
 
 health_data_bp = Blueprint("health_data", __name__, url_prefix="/api")
 
@@ -132,7 +134,6 @@ def fetch_data():
 @health_data_bp.route("/ai/test", methods=["GET"])
 def test_gemini():
     """Test Gemini API connectivity and list available models."""
-    load_dotenv()
     api_key = os.getenv("GEMINI_API_KEY")
 
     models: List[str] = []
