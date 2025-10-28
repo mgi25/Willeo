@@ -131,15 +131,20 @@ export default function VoiceAssistant() {
     if (!trimmed) return;
 
     const userMessage = createMessage("user", trimmed);
-    setMessages((prev) => [...prev, userMessage]);
+    const thinkingMessage = createMessage("ai", "Wellio is thinking...");
+
+    setMessages((prev) => [...prev, userMessage, thinkingMessage]);
     setInput("");
     setLoading(true);
 
     try {
-      const res = await askAssistant(trimmed);
-      const reply = res.answer?.trim() || "I'm here, tell me more.";
-      const aiMessage = createMessage("ai", reply);
-      setMessages((prev) => [...prev, aiMessage]);
+      const aiResponse = await askAssistant(trimmed);
+      const reply = (aiResponse || "").trim() || "I'm here, tell me more.";
+      setMessages((prev) =>
+        prev.map((msg) =>
+          msg.id === thinkingMessage.id ? { ...thinkingMessage, text: reply } : msg
+        )
+      );
       setIsSpeaking(true);
       await playResponseTone();
       speak(reply);
@@ -148,8 +153,12 @@ export default function VoiceAssistant() {
       }
     } catch (error) {
       console.error(error);
-      const fallback = createMessage("ai", "Sorry, I didn’t quite catch that.");
-      setMessages((prev) => [...prev, fallback]);
+      const fallbackText = "⚠️ There was an issue connecting to Wellio’s brain.";
+      setMessages((prev) =>
+        prev.map((msg) =>
+          msg.id === thinkingMessage.id ? { ...thinkingMessage, text: fallbackText } : msg
+        )
+      );
       setIsSpeaking(false);
     } finally {
       setLoading(false);
