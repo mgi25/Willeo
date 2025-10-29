@@ -1,4 +1,8 @@
+"""Helpers for communicating with Gemini models."""
+
 import os
+from typing import Iterable
+
 from dotenv import load_dotenv
 import google.generativeai as genai
 
@@ -14,7 +18,7 @@ try:
     genai.configure(api_key=api_key)
 
     # ✅ Use a model that we KNOW exists for your key
-    MODEL = "models/gemini-2.5-flash"
+    MODEL = "models/gemini-2.5-flash-lite"
 
     model = genai.GenerativeModel(MODEL)
     print(f"✅ Connected to Gemini: {MODEL}")
@@ -42,6 +46,30 @@ def _safe_emotion_label(emotion_obj):
         return emotion_obj.lower()
 
     return "neutral"
+
+
+def _collect_stream_chunks(response_stream: Iterable) -> str:
+    """Safely collect streamed chunks from Gemini into a single string."""
+
+    chunks: list[str] = []
+
+    for chunk in response_stream:
+        # chunk may expose text directly or via "candidates" depending on SDK version
+        text = getattr(chunk, "text", None)
+        if text:
+            chunks.append(text)
+            continue
+
+        candidates = getattr(chunk, "candidates", None)
+        if candidates:
+            try:
+                part_text = candidates[0].content.parts[0].text
+            except Exception:
+                part_text = None
+            if part_text:
+                chunks.append(part_text)
+
+    return "".join(chunks).strip()
 
 
 def get_ai_reply(user_text: str, mood_hint=None, context: str = None) -> str:
@@ -90,20 +118,23 @@ Wellio, answer in a warm, caring, first-person voice:
     """.strip()
 
     try:
-        response = model.generate_content(final_prompt)
+        response_stream = model.generate_content(final_prompt, stream=True)
+        final_reply = _collect_stream_chunks(response_stream)
 
-        # Prefer response.text if present
-        if hasattr(response, "text") and response.text:
-            return response.text.strip()
+        if final_reply:
+            return final_reply
 
-        # Fallback: candidates path (older SDKs sometimes use this)
-        if getattr(response, "candidates", None):
+        # If stream returned nothing, fall back to a non-streaming call.
+        fallback_response = model.generate_content(final_prompt)
+        if hasattr(fallback_response, "text") and fallback_response.text:
+            return fallback_response.text.strip()
+
+        if getattr(fallback_response, "candidates", None):
             try:
-                return response.candidates[0].content.parts[0].text.strip()
+                return fallback_response.candidates[0].content.parts[0].text.strip()
             except Exception:
                 pass
 
-        # Safety fallback
         return "I’m still here with you. Tell me more about how you're feeling right now."
 
     except Exception as e:
