@@ -1,3 +1,6 @@
+import os
+import threading
+
 from flask import Flask, jsonify, request
 from flask_cors import CORS
 
@@ -8,9 +11,16 @@ load_environment()
 from utils.emotion import analyze_user_text
 from utils.gemini import get_ai_reply
 from utils.memory import get_recent_context, record_mood, save_chat
+from utils.voice import synthesize_speech
 
 app = Flask(__name__)
 CORS(app)
+
+
+def async_task(fn, *args, **kwargs):
+    """Execute ``fn`` in a lightweight daemon thread."""
+
+    threading.Thread(target=fn, args=args, kwargs=kwargs, daemon=True).start()
 
 
 @app.route("/api/ai/text", methods=["POST"])
@@ -22,18 +32,32 @@ def chat_with_ai():
         if not user_text:
             return jsonify({"reply": "Please share what’s on your mind."}), 400
 
-        mood_hint = analyze_user_text(user_text)
+        if getattr(app, "_last_text", None) == user_text:
+            mood_hint = getattr(app, "_last_mood", {})
+        else:
+            mood_hint = analyze_user_text(user_text)
+            app._last_text = user_text
+            app._last_mood = mood_hint
+
         context = get_recent_context(user_id)
         ai_text = get_ai_reply(user_text, mood_hint, context)
 
-        save_chat(user_id, user_text, ai_text, mood_hint)
-        record_mood(user_id, mood_hint)
+        async_task(save_chat, user_id, user_text, ai_text, mood_hint)
+        async_task(record_mood, user_id, mood_hint)
 
-        return jsonify({"reply": ai_text})
+        voice_path = synthesize_speech(ai_text)
+
+        response_payload = {"reply": ai_text}
+        if voice_path:
+            response_payload["voice"] = voice_path
+
+        return jsonify(response_payload)
     except Exception as e:
         print("Error:", e)
         return jsonify({"reply": "Sorry, I’m having trouble right now."}), 500
 
 
 if __name__ == "__main__":
-    app.run(debug=True)
+    debug_mode = os.getenv("FLASK_DEBUG", "false").lower() == "true"
+    port = int(os.getenv("PORT", 5000))
+    app.run(host="0.0.0.0", port=port, debug=debug_mode)

@@ -11,7 +11,7 @@ from utils.env_loader import load_environment
 
 load_environment()
 
-_MODEL_NAME = os.getenv("GEMINI_MODEL", "models/gemini-1.5-flash")
+_MODEL_NAME = os.getenv("GEMINI_MODEL", "models/gemini-2.5-flash-lite")
 _FALLBACK_REPLY = "I'm here with you. Let’s take a deep breath together."
 _model: Optional[genai.GenerativeModel] = None
 
@@ -38,33 +38,56 @@ def _get_model() -> Optional[genai.GenerativeModel]:
     return _model
 
 
+def _format_emotion(mood_hint: Optional[dict]) -> str:
+    """Return a safe, human-readable emotion description."""
+
+    if not mood_hint:
+        return "neutral"
+
+    emotion = mood_hint.get("top_emotion") or mood_hint.get("emotion")
+    sentiment = mood_hint.get("sentiment")
+
+    if emotion and sentiment:
+        return f"{emotion} ({sentiment})"
+    if emotion:
+        return str(emotion)
+    if sentiment:
+        return str(sentiment)
+    return "neutral"
+
+
 def get_ai_reply(user_message, mood_hint, memory_context):
-    tone = mood_hint.get("top_emotion", "neutral")
-    sentiment = mood_hint.get("sentiment", "neutral")
-    prompt = f"""
-You are Wellio — a gentle, cinematic AI companion.
-Respond with empathy, warmth, and awareness of emotion.
-User mood: {tone} ({sentiment})
+    """Generate an empathetic reply using Gemini streaming responses."""
 
-Recent memory:
-{memory_context}
+    instructions = (
+        "You are Wellio — a calm, cinematic AI companion. "
+        "Respond with warmth and empathy, stay concise (<=3 sentences), "
+        "and stay grounded in the provided memory context."
+    )
+    emotion = _format_emotion(mood_hint)
+    context = memory_context or "None"
 
-User says: "{user_message}"
-
-Give a short, heartfelt, emotionally intelligent response (2–4 sentences max).
-    """
+    prompt = (
+        f"{instructions}\n\n"
+        f"Detected emotion: {emotion}.\n\n"
+        f"Recent context:\n{context}\n\n"
+        f"User: {user_message}\nWellio:"
+    )
 
     model = _get_model()
     if model is None:
         return _FALLBACK_REPLY
 
     try:
-        res = model.generate_content(prompt)
-        if hasattr(res, "text") and res.text:
-            return res.text.strip()
-        if getattr(res, "candidates", None):
-            return res.candidates[0].content.parts[0].text.strip()
-        print("[Gemini Warning] Empty response received; using fallback.")
+        response_stream = model.generate_content(prompt, stream=True)
+        final_reply = ""
+        for chunk in response_stream:
+            text = getattr(chunk, "text", None)
+            if text:
+                final_reply += text
+        if final_reply.strip():
+            return final_reply.strip()
+        print("[Gemini Warning] Empty streamed response; using fallback.")
     except Exception as exc:
         print("[Gemini Error]", exc)
 
