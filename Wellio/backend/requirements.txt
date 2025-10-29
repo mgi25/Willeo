@@ -5,4 +5,3 @@ pymongo
 transformers
 torch
 google-generativeai
-boto3
