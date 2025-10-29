@@ -1,71 +1,111 @@
-"""Helpers for generating conversational replies with Gemini."""
-
-from __future__ import annotations
-
 import os
-from typing import Optional
-
+from dotenv import load_dotenv
 import google.generativeai as genai
 
-from utils.env_loader import load_environment
+# Load env vars (GEMINI_API_KEY, etc.)
+load_dotenv()
+api_key = os.getenv("GEMINI_API_KEY")
 
-load_environment()
+if not api_key:
+    raise ValueError("⚠️ GEMINI_API_KEY not found in environment!")
 
-_MODEL_NAME = os.getenv("GEMINI_MODEL", "models/gemini-1.5-flash")
-_FALLBACK_REPLY = "I'm here with you. Let’s take a deep breath together."
-_model: Optional[genai.GenerativeModel] = None
+# Configure Gemini client
+try:
+    genai.configure(api_key=api_key)
 
+    # ✅ Use a model that we KNOW exists for your key
+    MODEL = "models/gemini-2.5-flash"
 
-def _get_model() -> Optional[genai.GenerativeModel]:
-    """Initialise the Gemini model once and reuse it."""
-
-    global _model
-    if _model is not None:
-        return _model
-
-    api_key = os.getenv("GEMINI_API_KEY")
-    if not api_key:
-        print("[Gemini Warning] Missing GEMINI_API_KEY; using fallback replies.")
-        return None
-
-    try:
-        genai.configure(api_key=api_key)
-        _model = genai.GenerativeModel(model_name=_MODEL_NAME)
-    except Exception as exc:  # pragma: no cover - configuration logging only
-        print(f"[Gemini Error] Failed to initialise model '{_MODEL_NAME}': {exc}")
-        _model = None
-
-    return _model
+    model = genai.GenerativeModel(MODEL)
+    print(f"✅ Connected to Gemini: {MODEL}")
+except Exception as e:
+    print(f"[Gemini Error] ❌ {e}")
+    model = None
 
 
-def get_ai_reply(user_message, mood_hint, memory_context):
-    tone = mood_hint.get("top_emotion", "neutral")
-    sentiment = mood_hint.get("sentiment", "neutral")
-    prompt = f"""
-You are Wellio — a gentle, cinematic AI companion.
-Respond with empathy, warmth, and awareness of emotion.
-User mood: {tone} ({sentiment})
+def _safe_emotion_label(emotion_obj):
+    """
+    emotion_obj could be:
+    - dict from analyze_user_text()
+    - string
+    - None
+    We normalize it to a lowercase string like "sad", "stressed", etc.
+    """
+    if isinstance(emotion_obj, dict):
+        # Our analyze_user_text returns { "sentiment": "...", "top_emotion": "...", ... }
+        # so we'll prefer top_emotion
+        if "top_emotion" in emotion_obj:
+            return str(emotion_obj["top_emotion"]).lower()
+        if "label" in emotion_obj:
+            return str(emotion_obj["label"]).lower()
+    elif isinstance(emotion_obj, str):
+        return emotion_obj.lower()
 
-Recent memory:
-{memory_context}
+    return "neutral"
 
-User says: "{user_message}"
 
-Give a short, heartfelt, emotionally intelligent response (2–4 sentences max).
+def get_ai_reply(user_text: str, mood_hint=None, context: str = None) -> str:
+    """
+    Create an empathetic, memory-aware response.
+
+    user_text  -> what the user just said
+    mood_hint  -> output from analyze_user_text()
+    context    -> recent convo history from Mongo
     """
 
-    model = _get_model()
-    if model is None:
-        return _FALLBACK_REPLY
+    if not model:
+        return "I'm here with you. I couldn't reach my thinking core just now, but you're not alone."
+
+    # Normalize emotion for the prompt
+    user_feeling = _safe_emotion_label(mood_hint)
+
+    # Build a rich prompt for the model
+    system_instructions = f"""
+You are Wellio, a gentle emotional support companion.
+Your job:
+- Be kind, calm, and extremely human.
+- Talk like you're here with them right now.
+- Keep replies short (2 to 4 sentences).
+- Ask one soft follow-up question at the end to keep them talking.
+- Never sound like a robot or therapist script.
+- Emotion detected: {user_feeling}.
+    """.strip()
+
+    memory_block = ""
+    if context:
+        memory_block = f"""
+Here is the recent conversation between you and the user. Use this to stay consistent and show you remember:
+{context}
+        """.strip()
+
+    final_prompt = f"""
+{system_instructions}
+
+{memory_block}
+
+The user now says:
+"{user_text}"
+
+Wellio, answer in a warm, caring, first-person voice:
+    """.strip()
 
     try:
-        res = model.generate_content(prompt)
-        if hasattr(res, "text") and res.text:
-            return res.text.strip()
-        if getattr(res, "candidates", None):
-            return res.candidates[0].content.parts[0].text.strip()
-        print("[Gemini Warning] Empty response received; using fallback.")
-    except Exception as exc:
-        print("[Gemini Error]", exc)
+        response = model.generate_content(final_prompt)
 
-    return _FALLBACK_REPLY
+        # Prefer response.text if present
+        if hasattr(response, "text") and response.text:
+            return response.text.strip()
+
+        # Fallback: candidates path (older SDKs sometimes use this)
+        if getattr(response, "candidates", None):
+            try:
+                return response.candidates[0].content.parts[0].text.strip()
+            except Exception:
+                pass
+
+        # Safety fallback
+        return "I’m still here with you. Tell me more about how you're feeling right now."
+
+    except Exception as e:
+        print(f"[Gemini Error] {e}")
+        return "Something went wrong in my thinking, but I’m still here with you. Keep talking to me."
