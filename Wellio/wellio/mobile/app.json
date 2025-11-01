@@ -1,0 +1,29 @@
+{
+  "expo": {
+    "name": "Wellio Auto-Connect",
+    "slug": "wellio-auto-connect",
+    "version": "1.0.0",
+    "sdkVersion": "49.0.0",
+    "platforms": ["ios", "android"],
+    "ios": {
+      "supportsTablet": true,
+      "bundleIdentifier": "com.wellio.autoconnect",
+      "infoPlist": {
+        "NSHealthShareUsageDescription": "Wellio uses Health data to show your heart rate, steps, and sleep.",
+        "NSBluetoothAlwaysUsageDescription": "Wellio needs Bluetooth to connect to your wearable.",
+        "UIBackgroundModes": ["fetch"]
+      }
+    },
+    "android": {
+      "package": "com.wellio.autoconnect",
+      "permissions": [
+        "android.permission.ACCESS_NETWORK_STATE",
+        "android.permission.INTERNET",
+        "android.permission.BLUETOOTH",
+        "android.permission.BLUETOOTH_ADMIN",
+        "android.permission.BLUETOOTH_CONNECT",
+        "android.permission.BLUETOOTH_SCAN"
+      ]
+    }
+  }
+}
