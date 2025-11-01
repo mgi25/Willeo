@@ -1,0 +1,12 @@
+# Node
+node_modules/
+.expo/
+
+# Python
+__pycache__/
+*.pyc
+.env
+
+# iOS/Android build
+android/app/build/
+ios/build/
