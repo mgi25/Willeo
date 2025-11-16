@@ -1,151 +1,167 @@
-import { useEffect, useState } from "react";
-import { getHealthData, askAssistant } from "./api";
+// =============================
+// Wellio Dashboard — Home Page
+// Modern AI ChatGPT-style Layout
+// =============================
+
+import React from "react";
+import { motion } from "framer-motion";
 
 export default function Dashboard() {
-  const [vitals, setVitals] = useState(null);
-  const [loadingVitals, setLoadingVitals] = useState(true);
-  const [question, setQuestion] = useState("");
-  const [reply, setReply] = useState("");
-  const [loadingAI, setLoadingAI] = useState(false);
-
-  // Load health data
-  useEffect(() => {
-    async function load() {
-      try {
-        const data = await getHealthData();
-        setVitals(data);
-      } catch (err) {
-        console.error(err);
-      } finally {
-        setLoadingVitals(false);
-      }
-    }
-    load();
-  }, []);
-
-  async function handleAsk() {
-    setLoadingAI(true);
-    try {
-      const aiReply = await askAssistant(question);
-      setReply(aiReply);
-    } catch (err) {
-      console.error(err);
-      setReply("⚠️ There was an issue connecting to Wellio’s brain.");
-    } finally {
-      setLoadingAI(false);
-    }
-  }
-
   return (
     <div
       style={{
         minHeight: "100vh",
-        background: "#0f172a",
-        color: "#fff",
-        padding: "1rem",
+        display: "flex",
+        justifyContent: "space-between",
+        alignItems: "center",
+        background: "linear-gradient(135deg, #0f172a, #1e2537)",
+        padding: "4rem 6rem",
         fontFamily: "Inter, system-ui, sans-serif",
+        color: "#fff",
       }}
     >
-      <h1 style={{ fontSize: "1.5rem", marginBottom: "1rem" }}>Wellio Dashboard</h1>
-
-      {/* Health Section */}
-      <section
-        style={{
-          background: "#1e2537",
-          borderRadius: "1rem",
-          padding: "1rem",
-          marginBottom: "1rem",
-        }}
-      >
-        <h2 style={{ fontSize: "1rem", color: "#a5b4fc" }}>Your Vitals</h2>
-        {loadingVitals ? (
-          <p>Loading vitals...</p>
-        ) : (
-          <div
-            style={{
-              display: "grid",
-              gridTemplateColumns: "repeat(auto-fit,minmax(120px,1fr))",
-              gap: "0.75rem",
-              marginTop: "0.5rem",
-            }}
-          >
-            <Card label="Heart Rate" value={vitals?.heart_rate} unit="bpm" />
-            <Card label="Sleep" value={vitals?.sleep_hours} unit="hrs" />
-            <Card label="Steps" value={vitals?.steps} unit="steps" />
-            <Card label="Stress" value={vitals?.stress_level} unit="/10" />
-          </div>
-        )}
-      </section>
-
-      {/* AI Assistant Section */}
-      <section
-        style={{
-          background: "#1e2537",
-          borderRadius: "1rem",
-          padding: "1rem",
-        }}
-      >
-        <h2 style={{ fontSize: "1rem", color: "#a5b4fc" }}>Ask Wellio</h2>
-        <div style={{ display: "flex", gap: "0.5rem", marginTop: "0.5rem" }}>
-          <input
-            value={question}
-            onChange={(e) => setQuestion(e.target.value)}
-            placeholder="e.g. How was my sleep this week?"
-            style={{
-              flex: 1,
-              background: "#0f172a",
-              color: "#fff",
-              borderRadius: "0.5rem",
-              border: "1px solid #475569",
-              padding: "0.5rem",
-            }}
-          />
-          <button
-            onClick={handleAsk}
-            disabled={loadingAI}
-            style={{
-              background: "#4f46e5",
-              color: "#fff",
-              borderRadius: "0.5rem",
-              border: "none",
-              padding: "0.5rem 0.75rem",
-              cursor: "pointer",
-            }}
-          >
-            {loadingAI ? "..." : "Ask"}
-          </button>
-        </div>
-        <div
+      {/* ---------------- LEFT SECTION ---------------- */}
+      <div style={{ flex: 1 }}>
+        <h1
           style={{
-            marginTop: "0.75rem",
-            background: "#0f172a",
-            borderRadius: "0.5rem",
-            border: "1px solid #475569",
-            padding: "0.75rem",
+            fontSize: "2.8rem",
+            fontWeight: "600",
+            marginBottom: "1rem",
+            color: "#a5b4fc",
           }}
         >
-          {reply || "AI reply will appear here"}
-        </div>
-      </section>
-    </div>
-  );
-}
+          Welcome back to Wellio
+        </h1>
+        <p
+          style={{
+            fontSize: "1.1rem",
+            color: "#cbd5e1",
+            maxWidth: "520px",
+            lineHeight: "1.8",
+          }}
+        >
+          Your AI companion is here to chat, assist, and evolve with you.  
+          Start a conversation or explore insights with a single click.
+        </p>
 
-function Card({ label, value, unit }) {
-  return (
-    <div
-      style={{
-        background: "#0f172a",
-        borderRadius: "0.75rem",
-        padding: "0.75rem",
-        border: "1px solid #475569",
-      }}
-    >
-      <div style={{ fontSize: "0.8rem", color: "#94a3b8" }}>{label}</div>
-      <div style={{ fontSize: "1.25rem", fontWeight: 600 }}>
-        {value ?? "--"}{" "}
-        <span style={{ fontSize: "0.8rem", color: "#64748b" }}>{unit}</span>
+        {/* ---- Chat preview bubble ---- */}
+        <div
+          style={{
+            marginTop: "3rem",
+            background: "#1e2537",
+            borderRadius: "1rem",
+            padding: "1.5rem",
+            width: "90%",
+            maxWidth: "480px",
+            boxShadow: "0 0 25px rgba(99,102,241,0.2)",
+          }}
+        >
+          <div
+            style={{
+              background: "#334155",
+              padding: "1rem 1.2rem",
+              borderRadius: "0.75rem",
+              maxWidth: "80%",
+              marginBottom: "1rem",
+            }}
+          >
+            <p>Hello, I’m Wellio — your voice companion. How are you feeling today?</p>
+          </div>
+          <div
+            style={{
+              background: "#6366f1",
+              padding: "1rem 1.2rem",
+              borderRadius: "0.75rem",
+              maxWidth: "60%",
+              marginLeft: "auto",
+              color: "#fff",
+            }}
+          >
+            <p>I’m feeling good! Let’s start something new.</p>
+          </div>
+        </div>
+
+        {/* ---- Buttons ---- */}
+        <div style={{ marginTop: "3rem", display: "flex", gap: "1rem" }}>
+          <button
+            style={{
+              background: "#6366f1",
+              color: "#fff",
+              padding: "0.8rem 1.8rem",
+              borderRadius: "0.6rem",
+              border: "none",
+              cursor: "pointer",
+              fontSize: "1rem",
+              boxShadow: "0 0 25px rgba(99,102,241,0.3)",
+              transition: "transform 0.3s ease",
+            }}
+            onMouseOver={(e) => (e.currentTarget.style.transform = "scale(1.05)")}
+            onMouseOut={(e) => (e.currentTarget.style.transform = "scale(1.0)")}
+          >
+            Start Chat
+          </button>
+          <button
+            style={{
+              background: "transparent",
+              color: "#a5b4fc",
+              padding: "0.8rem 1.8rem",
+              borderRadius: "0.6rem",
+              border: "1px solid #6366f1",
+              cursor: "pointer",
+              fontSize: "1rem",
+              transition: "transform 0.3s ease",
+            }}
+            onMouseOver={(e) => (e.currentTarget.style.transform = "scale(1.05)")}
+            onMouseOut={(e) => (e.currentTarget.style.transform = "scale(1.0)")}
+          >
+            Learn More
+          </button>
+        </div>
       </div>
+
+      {/* ---------------- RIGHT SECTION (AI Orb) ---------------- */}
+      <motion.div
+        style={{
+          width: "380px",
+          height: "380px",
+          borderRadius: "50%",
+          background:
+            "radial-gradient(circle at 30% 30%, rgba(99,102,241,0.7), rgba(147,51,234,0.6), rgba(236,72,153,0.5))",
+          boxShadow:
+            "0 0 60px rgba(99,102,241,0.4), 0 0 120px rgba(147,51,234,0.3), 0 0 160px rgba(236,72,153,0.2)",
+          display: "flex",
+          alignItems: "center",
+          justifyContent: "center",
+        }}
+        animate={{
+          scale: [1, 1.08, 1],
+          opacity: [1, 0.9, 1],
+        }}
+        transition={{
+          duration: 2.5,
+          repeat: Infinity,
+          ease: "easeInOut",
+        }}
+      >
+        <motion.div
+          style={{
+            width: "180px",
+            height: "180px",
+            borderRadius: "50%",
+            background:
+              "linear-gradient(135deg, #818cf8, #a855f7, #ec4899, #06b6d4)",
+            filter: "blur(2px)",
+          }}
+          animate={{
+            rotate: 360,
+          }}
+          transition={{
+            duration: 12,
+            repeat: Infinity,
+            ease: "linear",
+          }}
+        />
+      </motion.div>
     </div>
   );
 }
