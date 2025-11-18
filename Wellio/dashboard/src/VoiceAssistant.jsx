@@ -59,7 +59,7 @@ function Header({ onHome, palette, statusText }) {
         backdropFilter: "blur(12px)",
         WebkitBackdropFilter: "blur(12px)",
         background:
-          "linear-gradient(180deg, rgba(8,12,18,0.86) 0%, rgba(8,12,18,0.52) 100%)",
+          "linear-gradient(180deg, rgba(8,12,18,0.9) 0%, rgba(8,12,18,0.55) 100%)",
         borderBottom: "1px solid rgba(255,255,255,0.06)",
         boxShadow: "0 6px 24px rgba(0,0,0,0.25)",
       }}
@@ -80,28 +80,33 @@ function Header({ onHome, palette, statusText }) {
         style={{
           height: 64,
           display: "grid",
-          gridTemplateColumns: "200px 1fr auto",
+          gridTemplateColumns: "220px 1fr auto",
           alignItems: "center",
           padding: "0 18px",
           gap: 12,
         }}
       >
+        {/* Brand */}
         <button
           onClick={goHome}
           aria-label="Home"
           style={{
             fontWeight: 900,
-            letterSpacing: "0.04em",
+            letterSpacing: "0.12em",
             textTransform: "uppercase",
-            background: "transparent",
+            background:
+              "linear-gradient(90deg,#E6F1FF,#A3E9FF 30%,#A7F3CE 60%,#E6F1FF)",
+            WebkitBackgroundClip: "text",
+            color: "transparent",
             border: 0,
             cursor: "pointer",
-            color: "#E6F1FF",
+            fontSize: 14,
           }}
         >
-          WELLIO
+          W e l l i o
         </button>
 
+        {/* Center: Home + status */}
         <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
           <button
             onClick={goHome}
@@ -114,12 +119,12 @@ function Header({ onHome, palette, statusText }) {
               color: palette.text,
               cursor: "pointer",
               fontWeight: 600,
+              fontSize: 13,
             }}
           >
-            Home
+            Back to home
           </button>
 
-          {/* small live status badge */}
           <div
             title={statusText}
             style={{
@@ -155,6 +160,7 @@ function Header({ onHome, palette, statusText }) {
           </div>
         </div>
 
+        {/* Right: heartbeat gif */}
         <div
           aria-hidden
           style={{
@@ -189,6 +195,7 @@ export default function VoiceAssistant({ onHome }) {
   const [isSpeaking, setIsSpeaking] = useState(false);
   const [loading, setLoading] = useState(false);
   const [showPrompts, setShowPrompts] = useState(true);
+  const [isTyping, setIsTyping] = useState(false); // drives Orb gaze
 
   const recognitionRef = useRef(null);
   const chatEndRef = useRef(null);
@@ -208,7 +215,7 @@ export default function VoiceAssistant({ onHome }) {
     g3: "#2CB67D",
   };
 
-  // keyboard shortcuts: '/' focus, 'm' mic, 'Esc' cancel TTS/ASR
+  /* ---------------- Keyboard shortcuts ---------------- */
   useEffect(() => {
     const onKey = (e) => {
       if (e.key === "/" && !e.metaKey && !e.ctrlKey && !e.altKey) {
@@ -225,18 +232,19 @@ export default function VoiceAssistant({ onHome }) {
     return () => window.removeEventListener("keydown", onKey);
   }, []);
 
-  // auto-scroll
+  /* ---------------- Auto-scroll ---------------- */
   useEffect(
     () => chatEndRef.current?.scrollIntoView({ behavior: "smooth" }),
     [messages, loading]
   );
 
-  // cleanup
+  /* ---------------- Cleanup ---------------- */
   useEffect(() => {
     return () => {
       if (recognitionRef.current) recognitionRef.current.stop();
       stopAllAudio();
     };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   const stopAllAudio = () => {
@@ -254,10 +262,13 @@ export default function VoiceAssistant({ onHome }) {
     id: `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
     sender,
     text,
-    at: new Date().toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }),
+    at: new Date().toLocaleTimeString([], {
+      hour: "2-digit",
+      minute: "2-digit",
+    }),
   });
 
-  // voice
+  /* ---------------- Speech recognition ---------------- */
   function startListening() {
     if (!("webkitSpeechRecognition" in window)) {
       alert("Speech recognition not supported in this browser.");
@@ -279,6 +290,7 @@ export default function VoiceAssistant({ onHome }) {
     }
   }
 
+  /* ---------------- Text-to-speech ---------------- */
   function speak(text) {
     if (!("speechSynthesis" in window)) return;
     window.speechSynthesis.cancel();
@@ -299,10 +311,13 @@ export default function VoiceAssistant({ onHome }) {
     synth.triggerAttackRelease("C4", "8n");
   }
 
-  // chat
+  /* ---------------- Chat logic ---------------- */
   async function sendMessage(content) {
     const text = content.trim();
     if (!text) return;
+
+    setIsTyping(false); // stop typing state when message is sent
+
     const userMsg = createMessage("user", text);
     const thinking = createMessage("ai", "…");
     setMessages((p) => [...p, userMsg, thinking]);
@@ -332,16 +347,33 @@ export default function VoiceAssistant({ onHome }) {
     }
   }
 
-  const statusText = isListening ? "Listening" : isSpeaking ? "Speaking" : "Online";
+  const statusText = isListening
+    ? "Listening"
+    : isSpeaking
+    ? "Speaking"
+    : loading
+    ? "Thinking"
+    : "Online";
+
   const handleSubmit = (e) => {
     e.preventDefault();
+    if (!input.trim()) return;
     sendMessage(input);
   };
+
   const goHome = () => {
     if (typeof onHome === "function") onHome();
     else window.location.href = "/";
   };
 
+  // Track typing to drive Orb gaze
+  const handleInputChange = (e) => {
+    const value = e.target.value;
+    setInput(value);
+    setIsTyping(value.trim().length > 0);
+  };
+
+  /* ---------------- UI ---------------- */
   return (
     <div
       style={{
@@ -360,26 +392,38 @@ export default function VoiceAssistant({ onHome }) {
         ::-webkit-scrollbar { height: 10px; width: 10px; }
         ::-webkit-scrollbar-thumb { background: rgba(255,255,255,.15); border-radius: 12px; }
         ::-webkit-scrollbar-track { background: rgba(255,255,255,.04); }
+
+        .va-shell {
+          max-width: 1400px;
+          margin: 0 auto;
+          display: grid;
+          grid-template-columns: minmax(0, 1.05fr) minmax(0, 0.95fr);
+          gap: 16px;
+        }
+        @media (max-width: 960px) {
+          .va-shell {
+            grid-template-columns: minmax(0, 1fr);
+          }
+        }
       `}</style>
 
       <Header onHome={goHome} palette={P} statusText={statusText} />
 
       {/* Centered frame */}
-      <div style={{ paddingTop: 76, paddingLeft: 18, paddingRight: 18, paddingBottom: 18 }}>
-        <div
-          style={{
-            maxWidth: 1400,
-            margin: "0 auto",
-            display: "grid",
-            gridTemplateColumns: "minmax(0, 1.04fr) 1fr",
-            gap: 16,
-          }}
-        >
+      <div
+        style={{
+          paddingTop: 76,
+          paddingLeft: 18,
+          paddingRight: 18,
+          paddingBottom: 18,
+        }}
+      >
+        <div className="va-shell">
           {/* LEFT: Chat panel */}
           <div
             style={{
               position: "relative",
-              borderRadius: 18,
+              borderRadius: 20,
               background:
                 "linear-gradient(180deg, rgba(255,255,255,0.06), rgba(255,255,255,0.03))",
               boxShadow:
@@ -411,28 +455,33 @@ export default function VoiceAssistant({ onHome }) {
                   gap: 12,
                 }}
               >
-                <h1
-                  style={{
-                    margin: 0,
-                    fontSize: "clamp(22px,2.3vw,28px)",
-                    lineHeight: 1.1,
-                    letterSpacing: "-0.015em",
-                    fontWeight: 900,
-                    textTransform: "uppercase",
-                    background:
-                      "linear-gradient(90deg,#E6F1FF,#A3E9FF 30%,#A7F3CE 60%,#E6F1FF)",
-                    WebkitBackgroundClip: "text",
-                    color: "transparent",
-                  }}
-                >
-                  Wellio — Chat
-                </h1>
+                <div>
+                  <h1
+                    style={{
+                      margin: 0,
+                      fontSize: "clamp(22px,2.3vw,28px)",
+                      lineHeight: 1.1,
+                      letterSpacing: "-0.015em",
+                      fontWeight: 900,
+                      textTransform: "uppercase",
+                      background:
+                        "linear-gradient(90deg,#E6F1FF,#A3E9FF 30%,#A7F3CE 60%,#E6F1FF)",
+                      WebkitBackgroundClip: "text",
+                      color: "transparent",
+                    }}
+                  >
+                    Wellio — Chat
+                  </h1>
+                  <p style={{ margin: "6px 0 0", color: P.sub, fontSize: 13 }}>
+                    Minimal, expressive, fast. Type or use the mic — your pick.
+                  </p>
+                </div>
 
                 <div
                   style={{
                     display: "inline-flex",
                     alignItems: "center",
-                    gap: 10,
+                    gap: 8,
                     padding: "6px 12px",
                     borderRadius: 999,
                     border: `1px solid ${P.border}`,
@@ -452,15 +501,17 @@ export default function VoiceAssistant({ onHome }) {
                       }`,
                     }}
                   />
-                  <span style={{ fontSize: 12, letterSpacing: "0.1em", color: P.sub }}>
+                  <span
+                    style={{
+                      fontSize: 12,
+                      letterSpacing: "0.1em",
+                      color: P.sub,
+                    }}
+                  >
                     {statusText}
                   </span>
                 </div>
               </div>
-
-              <p style={{ margin: "6px 0 8px", color: P.sub, fontSize: 14 }}>
-                Minimal, expressive, fast. Type or use the mic — your pick.
-              </p>
 
               {/* Quick prompts */}
               {showPrompts && messages.length <= 1 && (
@@ -469,7 +520,7 @@ export default function VoiceAssistant({ onHome }) {
                     display: "flex",
                     flexWrap: "wrap",
                     gap: 8,
-                    marginTop: 8,
+                    marginTop: 12,
                     marginBottom: 6,
                   }}
                 >
@@ -579,14 +630,14 @@ export default function VoiceAssistant({ onHome }) {
                 })}
               </AnimatePresence>
 
-              {/* typing indicator */}
+              {/* assistant thinking indicator (AI loading) */}
               <AnimatePresence>
                 {loading && (
                   <motion.div
-                    initial={{ opacity: 0, y: 6 }}
-                    animate={{ opacity: 1, y: 0 }}
-                    exit={{ opacity: 0, y: -6 }}
-                    transition={{ duration: 0.25 }}
+                    initial={{ opacity: 0, y: 8, scale: 0.96 }}
+                    animate={{ opacity: 1, y: 0, scale: 1 }}
+                    exit={{ opacity: 0, y: 8, scale: 0.96 }}
+                    transition={{ duration: 0.35, ease: "easeInOut" }}
                     style={{
                       display: "flex",
                       alignItems: "center",
@@ -616,14 +667,31 @@ export default function VoiceAssistant({ onHome }) {
                             borderRadius: "50%",
                             background: i === 0 ? P.g1 : i === 1 ? P.g2 : P.g3,
                           }}
-                          animate={{ y: [0, -6, 0], opacity: [0.6, 1, 0.6] }}
-                          transition={{ duration: 0.9, repeat: Infinity, delay: i * 0.15 }}
+                          animate={{
+                            scale: [0.85, 1.1, 0.85],
+                            opacity: [0.3, 1, 0.3],
+                          }}
+                          transition={{
+                            duration: 1.1,
+                            repeat: Infinity,
+                            ease: "easeInOut",
+                            delay: i * 0.18,
+                          }}
                         />
                       ))}
                     </motion.span>
-                    <span style={{ fontSize: 13, letterSpacing: "0.08em" }}>
-                      Thinking.
-                    </span>
+
+                    <motion.span
+                      style={{ fontSize: 13, letterSpacing: "0.08em" }}
+                      animate={{ opacity: [0.6, 1, 0.6] }}
+                      transition={{
+                        duration: 1.4,
+                        repeat: Infinity,
+                        ease: "easeInOut",
+                      }}
+                    >
+                      Thinking…
+                    </motion.span>
                   </motion.div>
                 )}
               </AnimatePresence>
@@ -635,8 +703,8 @@ export default function VoiceAssistant({ onHome }) {
               onSubmit={handleSubmit}
               style={{
                 display: "flex",
-                alignItems: "center",
-                gap: 10,
+                flexDirection: "column",
+                gap: 8,
                 padding: 12,
                 margin: 12,
                 borderRadius: 16,
@@ -659,103 +727,139 @@ export default function VoiceAssistant({ onHome }) {
                   pointerEvents: "none",
                 }}
               />
-              <motion.button
-                type="button"
-                onClick={startListening}
-                whileTap={{ scale: 0.9 }}
-                whileHover={{ scale: 1.06 }}
-                animate={
-                  isListening
-                    ? { boxShadow: "0 0 24px rgba(0,212,255,.45)", scale: [1, 1.06, 1] }
-                    : { boxShadow: "0 0 0 rgba(0,0,0,0)" }
-                }
-                transition={{ duration: 1.2, repeat: isListening ? Infinity : 0 }}
-                style={{
-                  background:
-                    "linear-gradient(135deg, rgba(127,90,240,.35), rgba(0,212,255,.35))",
-                  border: "1px solid rgba(255,255,255,.14)",
-                  color: P.text,
-                  borderRadius: 12,
-                  width: 44,
-                  height: 44,
-                  display: "grid",
-                  placeItems: "center",
-                  cursor: "pointer",
-                }}
-                title="Speak (M)"
-                aria-label="Start voice input"
-              >
-                <Mic />
-              </motion.button>
 
-              <input
-                ref={inputRef}
-                type="text"
-                placeholder="Type your message…  (Press Enter to send, / to focus)"
-                value={input}
-                onChange={(e) => setInput(e.target.value)}
+              <div
                 style={{
-                  flex: 1,
-                  background: "transparent",
-                  border: "none",
-                  outline: "none",
-                  color: P.text,
-                  fontSize: 16,
-                }}
-              />
-
-              <motion.button
-                type="submit"
-                whileTap={{ scale: 0.95 }}
-                whileHover={{ scale: 1.06 }}
-                disabled={loading}
-                style={{
+                  display: "flex",
+                  alignItems: "center",
+                  gap: 10,
                   position: "relative",
-                  border: "1px solid rgba(255,255,255,.14)",
-                  background:
-                    "linear-gradient(135deg, rgba(44,182,125,.42), rgba(127,90,240,.42))",
-                  color: P.text,
-                  width: 44,
-                  height: 44,
-                  borderRadius: 12,
-                  display: "grid",
-                  placeItems: "center",
-                  cursor: loading ? "not-allowed" : "pointer",
-                  opacity: loading ? 0.6 : 1,
-                  overflow: "hidden",
+                  zIndex: 1,
                 }}
-                aria-label="Send message"
               >
-                <Send />
-                <motion.span
-                  aria-hidden
-                  initial={{ opacity: 0, scale: 0 }}
-                  whileTap={{ opacity: 0.3, scale: 2.2 }}
-                  transition={{ duration: 0.35, ease: "easeOut" }}
+                <motion.button
+                  type="button"
+                  onClick={startListening}
+                  whileTap={{ scale: 0.9 }}
+                  whileHover={{ scale: 1.06 }}
+                  animate={
+                    isListening
+                      ? {
+                          boxShadow: "0 0 24px rgba(0,212,255,.45)",
+                          scale: [1, 1.06, 1],
+                        }
+                      : { boxShadow: "0 0 0 rgba(0,0,0,0)" }
+                  }
+                  transition={{
+                    duration: 1.2,
+                    repeat: isListening ? Infinity : 0,
+                  }}
                   style={{
-                    position: "absolute",
-                    width: 120,
-                    height: 120,
-                    borderRadius: "50%",
-                    background: "radial-gradient(circle, #7F5AF0 0%, transparent 60%)",
+                    background:
+                      "linear-gradient(135deg, rgba(127,90,240,.35), rgba(0,212,255,.35))",
+                    border: "1px solid rgba(255,255,255,.14)",
+                    color: P.text,
+                    borderRadius: 12,
+                    width: 44,
+                    height: 44,
+                    display: "grid",
+                    placeItems: "center",
+                    cursor: "pointer",
+                  }}
+                  title="Speak (M)"
+                  aria-label="Start voice input"
+                >
+                  <Mic />
+                </motion.button>
+
+                <input
+                  ref={inputRef}
+                  type="text"
+                  placeholder="Type your message…  (Enter to send, / to focus, M to talk)"
+                  value={input}
+                  onChange={handleInputChange}
+                  onFocus={() => {
+                    if (input.trim().length > 0) setIsTyping(true);
+                  }}
+                  onBlur={() => setIsTyping(false)}
+                  style={{
+                    flex: 1,
+                    background: "transparent",
+                    border: "none",
+                    outline: "none",
+                    color: P.text,
+                    fontSize: 16,
                   }}
                 />
-              </motion.button>
+
+                <motion.button
+                  type="submit"
+                  whileTap={{ scale: 0.95 }}
+                  whileHover={{ scale: 1.06 }}
+                  disabled={loading}
+                  style={{
+                    position: "relative",
+                    border: "1px solid rgba(255,255,255,.14)",
+                    background:
+                      "linear-gradient(135deg, rgba(44,182,125,.42), rgba(127,90,240,.42))",
+                    color: P.text,
+                    width: 44,
+                    height: 44,
+                    borderRadius: 12,
+                    display: "grid",
+                    placeItems: "center",
+                    cursor: loading ? "not-allowed" : "pointer",
+                    opacity: loading ? 0.6 : 1,
+                    overflow: "hidden",
+                  }}
+                  aria-label="Send message"
+                >
+                  <Send />
+                  <motion.span
+                    aria-hidden
+                    initial={{ opacity: 0, scale: 0 }}
+                    whileTap={{ opacity: 0.3, scale: 2.2 }}
+                    transition={{ duration: 0.35, ease: "easeOut" }}
+                    style={{
+                      position: "absolute",
+                      width: 120,
+                      height: 120,
+                      borderRadius: "50%",
+                      background:
+                        "radial-gradient(circle, #7F5AF0 0%, transparent 60%)",
+                    }}
+                  />
+                </motion.button>
+              </div>
+
+              <div
+                style={{
+                  fontSize: 11,
+                  color: P.sub,
+                  textAlign: "right",
+                  position: "relative",
+                  zIndex: 1,
+                }}
+              >
+                Shortcuts: <strong>/</strong> focus • <strong>M</strong> mic •{" "}
+                <strong>Esc</strong> stop audio
+              </div>
             </form>
           </div>
 
-          {/* RIGHT: Orb panel with aura and divider */}
+          {/* RIGHT: Orb panel */}
           <div
             style={{
               position: "relative",
-              borderRadius: 18,
+              borderRadius: 20,
               overflow: "hidden",
               border: `1px solid ${P.border}`,
               background: P.panelAlt,
               boxShadow: "0 10px 26px rgba(0,0,0,0.35)",
               minHeight: "calc(78vh)",
               display: "grid",
-              placeItems: "center",
+              gridTemplateRows: "auto 1fr auto",
+              padding: 14,
               isolation: "isolate",
             }}
           >
@@ -789,35 +893,137 @@ export default function VoiceAssistant({ onHome }) {
               }}
             />
 
-            {/* grid */}
+            {/* grid overlay */}
             <div style={{ position: "absolute", inset: 0, zIndex: 1 }}>
-              <AnimatedGrid active={isListening || isSpeaking} fast={isSpeaking} cell={28} />
+              <AnimatedGrid
+                active={isListening || isSpeaking || loading}
+                fast={isSpeaking}
+                cell={28}
+              />
             </div>
 
-            {/* orb + tiny status */}
-            <div style={{ zIndex: 2, transform: "translateY(-6px)" }}>
+            {/* top bar */}
+            <div
+              style={{
+                position: "relative",
+                zIndex: 2,
+                display: "flex",
+                justifyContent: "space-between",
+                alignItems: "center",
+                padding: "4px 4px 8px 6px",
+              }}
+            >
+              <div>
+                <div
+                  style={{
+                    fontSize: 11,
+                    letterSpacing: "0.14em",
+                    textTransform: "uppercase",
+                    color: P.sub,
+                  }}
+                >
+                  Orb stage
+                </div>
+                <div style={{ fontSize: 13, color: P.sub, opacity: 0.85 }}>
+                  Visual pulse of how Wellio is responding.
+                </div>
+              </div>
+              <div
+                style={{
+                  display: "flex",
+                  gap: 6,
+                  fontSize: 10,
+                  textTransform: "uppercase",
+                  letterSpacing: "0.12em",
+                }}
+              >
+                <OrbChip label="Listening" active={isListening} />
+                <OrbChip label="Speaking" active={isSpeaking} />
+                <OrbChip label="Thinking" active={loading} />
+              </div>
+            </div>
+
+            {/* orb centre */}
+            <div
+              style={{
+                position: "relative",
+                zIndex: 2,
+                display: "grid",
+                placeItems: "center",
+              }}
+            >
+              <div
+                style={{
+                  position: "absolute",
+                  width: "72%",
+                  maxWidth: 420,
+                  aspectRatio: "1/1",
+                  borderRadius: "50%",
+                  background:
+                    "radial-gradient(circle at 50% 20%, rgba(0,212,255,.35), transparent 60%)",
+                  filter: "blur(28px)",
+                  opacity: 0.85,
+                  transform: "translateY(24px)",
+                }}
+              />
               <Orb
                 isListening={isListening}
                 isSpeaking={isSpeaking}
+                isThinking={loading}
+                isTyping={isTyping} // drives eye gaze toward input
                 audioReactive
                 size={"clamp(260px, 32vw, 420px)"}
                 mode="inline"
               />
-              <div
-                style={{
-                  marginTop: 12,
-                  textAlign: "center",
-                  fontSize: 12,
-                  color: P.sub,
-                  letterSpacing: "0.08em",
-                }}
-              >
-                {statusText}
-              </div>
+            </div>
+
+            {/* bottom helper text */}
+            <div
+              style={{
+                position: "relative",
+                zIndex: 2,
+                textAlign: "center",
+                fontSize: 11,
+                color: P.sub,
+                paddingBottom: 4,
+              }}
+            >
+              Status: <span style={{ color: P.text }}>{statusText}</span> • Tip: press{" "}
+              <strong>M</strong> to talk, <strong>Esc</strong> to stop audio.
             </div>
           </div>
         </div>
       </div>
+    </div>
+  );
+}
+
+/* ---------------- Small UI helpers ---------------- */
+
+function OrbChip({ label, active }) {
+  return (
+    <div
+      style={{
+        padding: "4px 8px",
+        borderRadius: 999,
+        border: `1px solid rgba(255,255,255,${active ? 0.4 : 0.1})`,
+        background: active ? "rgba(127,90,240,0.35)" : "rgba(15,19,26,0.85)",
+        color: "#E6F1FF",
+        display: "inline-flex",
+        alignItems: "center",
+        gap: 6,
+      }}
+    >
+      <span
+        style={{
+          width: 6,
+          height: 6,
+          borderRadius: "50%",
+          background: active ? "#00D4FF" : "#4B5563",
+          boxShadow: active ? "0 0 8px rgba(0,212,255,.8)" : "none",
+        }}
+      />
+      <span>{label}</span>
     </div>
   );
 }

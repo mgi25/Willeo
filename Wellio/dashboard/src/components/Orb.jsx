@@ -7,6 +7,7 @@ import { motion, useReducedMotion } from "framer-motion";
  * - Blank oval eyes (no pupils/iris)
  * - True blink (ry animated)
  * - Subtle eye tracking
+ * - Typing: eyes look toward text box (down-left)
  * - Speaking: gentle bobble/squint via group animation (no mouth)
  * - Thinking: two eyes orbit the rim as a loader
  */
@@ -15,6 +16,7 @@ export default function Orb({
   isListening = false,
   isSpeaking = false,
   isThinking = false,
+  isTyping = false,          // NEW
   size = 320,
   className,
   style,
@@ -46,10 +48,22 @@ export default function Orb({
             pointerEvents: "none",
           }}
           animate={{
-            opacity: isThinking ? [0.4, 0.7, 0.4] : isSpeaking ? [0.5, 0.8, 0.5] : [0.3, 0.5, 0.3],
-            scale: isThinking ? [1, 1.1, 1] : isSpeaking ? [1, 1.08, 1] : [1, 1.05, 1],
+            opacity: isThinking
+              ? [0.4, 0.7, 0.4]
+              : isSpeaking
+              ? [0.5, 0.8, 0.5]
+              : [0.3, 0.5, 0.3],
+            scale: isThinking
+              ? [1, 1.1, 1]
+              : isSpeaking
+              ? [1, 1.08, 1]
+              : [1, 1.05, 1],
           }}
-          transition={{ duration: isThinking ? 1.8 : isSpeaking ? 1.2 : 3.4, repeat: Infinity, ease: "easeInOut" }}
+          transition={{
+            duration: isThinking ? 1.8 : isSpeaking ? 1.2 : 3.4,
+            repeat: Infinity,
+            ease: "easeInOut",
+          }}
         />
       )}
 
@@ -70,7 +84,8 @@ export default function Orb({
           display: "block",
           borderRadius: "50%",
           overflow: "visible",
-          boxShadow: "0 22px 60px rgba(0,0,0,.45), inset 0 2px 10px rgba(255,255,255,.06)",
+          boxShadow:
+            "0 22px 60px rgba(0,0,0,.45), inset 0 2px 10px rgba(255,255,255,.06)",
         }}
       >
         <defs>
@@ -109,7 +124,7 @@ export default function Orb({
           )}
           <circle cx="50" cy="50" r="49" fill="url(#vignette)" />
 
-          {/* Note: some browsers ignore CSS gradients on SVG fill; if yours is fine, keep it. */}
+          {/* Optional moving highlight */}
           {!rMotion && (
             <motion.circle
               cx="50"
@@ -142,10 +157,20 @@ export default function Orb({
         />
 
         {/* Face */}
-        {isThinking ? <EyesSpinnerOrbit /> : <Eyes isListening={isListening} isSpeaking={isSpeaking} />}
+        {isThinking ? (
+          <EyesSpinnerOrbit />
+        ) : (
+          <Eyes
+            isListening={isListening}
+            isSpeaking={isSpeaking}
+            isTyping={isTyping} // NEW
+          />
+        )}
 
         {/* Ambient particles */}
-        {!rMotion && <AmbientParticles isActive={isSpeaking || isListening || isThinking} />}
+        {!rMotion && (
+          <AmbientParticles isActive={isSpeaking || isListening || isThinking} />
+        )}
       </svg>
 
       {/* Breathing glow */}
@@ -158,10 +183,14 @@ export default function Orb({
             borderRadius: "50%",
             filter: "blur(60px)",
             mixBlendMode: "screen",
-            background: "radial-gradient(40% 40% at 70% 70%, rgba(99,102,241,.28), transparent 60%)",
+            background:
+              "radial-gradient(40% 40% at 70% 70%, rgba(99,102,241,.28), transparent 60%)",
             pointerEvents: "none",
           }}
-          animate={{ opacity: isSpeaking ? [0.5, 0.75, 0.5] : [0.35, 0.55, 0.35], scale: isSpeaking ? [1, 1.05, 1] : [1, 1.03, 1] }}
+          animate={{
+            opacity: isSpeaking ? [0.5, 0.75, 0.5] : [0.35, 0.55, 0.35],
+            scale: isSpeaking ? [1, 1.05, 1] : [1, 1.03, 1],
+          }}
           transition={{ duration: isSpeaking ? 1.5 : 3.4, repeat: Infinity, ease: "easeInOut" }}
         />
       )}
@@ -174,7 +203,8 @@ export default function Orb({
             position: "absolute",
             inset: 0,
             borderRadius: "50%",
-            background: "linear-gradient(120deg, transparent 30%, rgba(255,255,255,.12) 50%, transparent 70%)",
+            background:
+              "linear-gradient(120deg, transparent 30%, rgba(255,255,255,.12) 50%, transparent 70%)",
             mixBlendMode: "overlay",
             pointerEvents: "none",
           }}
@@ -230,7 +260,12 @@ function AmbientParticles({ isActive }) {
               cx: [x, x + Math.cos(angle) * 3, x],
               cy: [y, y + Math.sin(angle) * 3, y],
             }}
-            transition={{ duration: 3 + (i % 3), repeat: Infinity, ease: "easeInOut", delay: (i % 4) * 0.3 }}
+            transition={{
+              duration: 3 + (i % 3),
+              repeat: Infinity,
+              ease: "easeInOut",
+              delay: (i % 4) * 0.3,
+            }}
           />
         );
       })}
@@ -238,8 +273,8 @@ function AmbientParticles({ isActive }) {
   );
 }
 
-/* ---------- Eyes (blink + tracking + speaking bobble) ---------- */
-function Eyes({ isListening, isSpeaking }) {
+/* ---------- Eyes (blink + tracking + typing + speaking bobble) ---------- */
+function Eyes({ isListening, isSpeaking, isTyping }) {
   const gap = 34;
   const cxL = 50 - gap / 2;
   const cxR = 50 + gap / 2;
@@ -248,36 +283,76 @@ function Eyes({ isListening, isSpeaking }) {
   const [lookOffset, setLookOffset] = useState({ x: 0, y: 0 });
 
   useEffect(() => {
-    const getRange = () => (isSpeaking ? { x: 2.5, y: 2, ms: 600 } : isListening ? { x: 1.5, y: 1.2, ms: 1800 } : { x: 3, y: 2.5, ms: 2500 });
+    // When typing: fix gaze down-left towards input, no wandering
+    if (isTyping) {
+      setLookOffset({ x: -6, y: 7 }); // tuned for chat-on-left, input-at-bottom
+      return;
+    }
+
+    // Idle / listening / speaking wandering
+    const getRange = () =>
+      isSpeaking
+        ? { x: 2.5, y: 2, ms: 600 }
+        : isListening
+        ? { x: 1.5, y: 1.2, ms: 1800 }
+        : { x: 3, y: 2.5, ms: 2500 };
+
     const { x, y, ms } = getRange();
-    const move = () => setLookOffset({ x: (Math.random() - 0.5) * 2 * x, y: (Math.random() - 0.5) * 2 * y });
+
+    const move = () =>
+      setLookOffset({
+        x: (Math.random() - 0.5) * 2 * x,
+        y: (Math.random() - 0.5) * 2 * y,
+      });
+
     move();
     const id = setInterval(move, ms);
     return () => clearInterval(id);
-  }, [isSpeaking, isListening]);
+  }, [isSpeaking, isListening, isTyping]);
+
+  // Group bobble:
+  // - typing: lean slightly towards the box
+  // - speaking: nod rhythm
+  // - listening: gentle attentive stretch
+  const animateGroup = isTyping
+    ? { x: -2, y: 3, rotate: -8, scaleX: 1.02, scaleY: 0.98 }
+    : isSpeaking
+    ? { scaleY: [1, 0.95, 1.02, 1], rotate: [0, -0.6, 0.6, 0] }
+    : isListening
+    ? { scaleY: [1, 1.03, 1], rotate: 0 }
+    : {};
+
+  const transitionGroup = isTyping
+    ? { duration: 0.25, ease: "easeOut" }
+    : { duration: isSpeaking ? 0.9 : 1.6, repeat: Infinity, ease: "easeInOut" };
 
   return (
-    // Speaking bobble (subtle nod & squint rhythm)
-    <motion.g
-      animate={
-        isSpeaking
-          ? { scaleY: [1, 0.95, 1.02, 1], rotate: [0, -0.6, 0.6, 0] }
-          : isListening
-          ? { scaleY: [1, 1.03, 1], rotate: 0 }
-          : {}
-      }
-      transition={{ duration: isSpeaking ? 0.9 : 1.6, repeat: Infinity, ease: "easeInOut" }}
-    >
-      <motion.g animate={{ x: lookOffset.x, y: lookOffset.y }} transition={{ duration: 0.8, ease: "easeInOut" }}>
-        <BlinkingEye cx={cxL} cy={cy} delay={0} isListening={isListening} isSpeaking={isSpeaking} />
-        <BlinkingEye cx={cxR} cy={cy} delay={0.06} isListening={isListening} isSpeaking={isSpeaking} />
+    <motion.g animate={animateGroup} transition={transitionGroup}>
+      <motion.g
+        animate={{ x: lookOffset.x, y: lookOffset.y }}
+        transition={{ duration: 0.8, ease: "easeInOut" }}
+      >
+        <BlinkingEye
+          cx={cxL}
+          cy={cy}
+          delay={0}
+          isListening={isListening}
+          isTyping={isTyping}
+        />
+        <BlinkingEye
+          cx={cxR}
+          cy={cy}
+          delay={0.06}
+          isListening={isListening}
+          isTyping={isTyping}
+        />
       </motion.g>
     </motion.g>
   );
 }
 
 /* ---------- Single Eye with true blink ---------- */
-function BlinkingEye({ cx, cy, delay = 0, isListening }) {
+function BlinkingEye({ cx, cy, delay = 0, isListening, isTyping }) {
   const [ry, setRy] = useState(11);
   const rMotion = useReducedMotion();
   const baseRx = 8;
@@ -302,6 +377,7 @@ function BlinkingEye({ cx, cy, delay = 0, isListening }) {
         await sleep(base + jitter);
         if (!mounted) break;
         await blinkOnce();
+        // chance for double-blink
         if (Math.random() < 0.3 && mounted) {
           await sleep(150);
           await blinkOnce();
@@ -315,7 +391,7 @@ function BlinkingEye({ cx, cy, delay = 0, isListening }) {
     };
   }, [rMotion, delay]);
 
-  const listenScale = isListening ? 1.05 : 1.0;
+  const listenScale = isTyping ? 1.07 : isListening ? 1.05 : 1.0;
 
   return (
     <motion.ellipse
@@ -370,7 +446,12 @@ function EyesSpinnerOrbit() {
         style={{ transformOrigin: "50px 50px" }}
       />
 
-      <motion.g initial={{ rotate: 0 }} animate={{ rotate: 360 }} transition={{ duration: 1.6, repeat: Infinity, ease: "linear" }} style={{ transformOrigin: "50px 50px" }}>
+      <motion.g
+        initial={{ rotate: 0 }}
+        animate={{ rotate: 360 }}
+        transition={{ duration: 1.6, repeat: Infinity, ease: "linear" }}
+        style={{ transformOrigin: "50px 50px" }}
+      >
         <motion.ellipse
           cx={50 + R}
           cy={50}
@@ -390,16 +471,50 @@ function EyesSpinnerOrbit() {
           ry={eyeRy + 3}
           fill="rgba(138,43,226,.25)"
           animate={{ scale: [1, 1.25, 1], opacity: [0.25, 0.4, 0.25] }}
-          transition={{ duration: 0.8, repeat: Infinity, ease: "easeInOut", delay: 0.4 }}
+          transition={{
+            duration: 0.8,
+            repeat: Infinity,
+            ease: "easeInOut",
+            delay: 0.4,
+          }}
           style={{ transformOrigin: `${50 - R}px 50px` }}
         />
         <ellipse cx={50 - R} cy={50} rx={eyeRx} ry={eyeRy} fill="#FFFFFF" />
       </motion.g>
 
-      <motion.circle cx="50" cy="50" r="5" fill="rgba(138,43,226,.15)" animate={{ scale: [1, 1.6, 1], opacity: [0.15, 0.35, 0.15] }} transition={{ duration: 1.2, repeat: Infinity, ease: "easeInOut" }} />
-      <motion.circle cx="50" cy="50" r="3" fill="rgba(255,255,255,.7)" animate={{ scale: [1, 1.4, 1], opacity: [0.7, 1, 0.7] }} transition={{ duration: 1.2, repeat: Infinity, ease: "easeInOut" }} />
+      <motion.circle
+        cx="50"
+        cy="50"
+        r="5"
+        fill="rgba(138,43,226,.15)"
+        animate={{ scale: [1, 1.6, 1], opacity: [0.15, 0.35, 0.15] }}
+        transition={{ duration: 1.2, repeat: Infinity, ease: "easeInOut" }}
+      />
+      <motion.circle
+        cx="50"
+        cy="50"
+        r="3"
+        fill="rgba(255,255,255,.7)"
+        animate={{ scale: [1, 1.4, 1], opacity: [0.7, 1, 0.7] }}
+        transition={{ duration: 1.2, repeat: Infinity, ease: "easeInOut" }}
+      />
       {[0, 1, 2].map((i) => (
-        <motion.circle key={`wave-${i}`} cx="50" cy="50" r="0" fill="none" stroke="rgba(138,43,226,.3)" strokeWidth="1" animate={{ r: [0, R + 10], opacity: [0.3, 0] }} transition={{ duration: 2, repeat: Infinity, ease: "easeOut", delay: i * 0.7 }} />
+        <motion.circle
+          key={`wave-${i}`}
+          cx="50"
+          cy="50"
+          r="0"
+          fill="none"
+          stroke="rgba(138,43,226,.3)"
+          strokeWidth="1"
+          animate={{ r: [0, R + 10], opacity: [0.3, 0] }}
+          transition={{
+            duration: 2,
+            repeat: Infinity,
+            ease: "easeOut",
+            delay: i * 0.7,
+          }}
+        />
       ))}
     </g>
   );
